@@ -54,7 +54,8 @@ def object(account, bucket, obj):
     obj     = secure_name(obj)
 
     host = flask.request.headers['HOST']
-    dir_path = '/var/www/includes/scs/%s/%s/%s' % (host, account, bucket)
+    dir_path = '%s/%s/%s/%s' % ( \
+        app.config['STORAGE_DIRECTORY'], host, account, bucket)
     file_path = '%s/%s' % (dir_path, obj)
 
     if flask.request.method == 'PUT':
