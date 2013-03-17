@@ -1,0 +1,34 @@
+dc0:
+    - dc0-node0.example.com
+    - dc0-node1.example.com
+    - dc0-node2.example.com
+    - dc0-node3.example.com
+    - dc0-node4.example.com
+    - dc0-node5.example.com
+    - dc0-node6.example.com
+    - dc0-node7.example.com
+    - dc0-node8.example.com
+    - dc0-node9.example.com
+dc1:
+    - dc1-node0.example.com
+    - dc1-node1.example.com
+    - dc1-node2.example.com
+    - dc1-node3.example.com
+    - dc1-node4.example.com
+    - dc1-node5.example.com
+    - dc1-node6.example.com
+    - dc1-node7.example.com
+    - dc1-node8.example.com
+    - dc1-node9.example.com
+dc2:
+    - dc2-node0.example.com
+    - dc2-node1.example.com
+    - dc2-node2.example.com
+    - dc2-node3.example.com
+    - dc2-node4.example.com
+    - dc2-node5.example.com
+    - dc2-node6.example.com
+    - dc2-node7.example.com
+    - dc2-node8.example.com
+    - dc2-node9.example.com
+
