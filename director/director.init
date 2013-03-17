@@ -12,12 +12,12 @@
 case "$1" in
     start)
         echo -n "Starting Simple Cloud Storage Director"
-        su - scs -c /srv/scs/director/director.py >> /var/log/scs/director.log 2>&1 &
+        su - scs -c /srv/scs/director/tornado.py >> /var/log/scs/director.log 2>&1 &
         echo " "
         ;;
     stop)
         echo -n "Shutting down Simple Cloud Storage Director"
-        pkill -u scs -f "python /srv/scs/director/director.py"
+        pkill -u scs -f "python /srv/scs/director/tornado.py"
         echo " "
         ;;
     restart)
@@ -25,7 +25,7 @@ case "$1" in
         $0 start
         ;;
     status)
-        pgrep -u scs -f "python /srv/scs/director/director.py"
+        pgrep -u scs -f "python /srv/scs/director/tornado.py"
         if [ $? -eq 0 ]; then
             echo "Running"
             exit 0
