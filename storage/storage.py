@@ -13,7 +13,7 @@ import werkzeug
 
 app = flask.Flask(__name__)
 app.config.from_pyfile('storage.cfg')
-app.config.from_pyfile('local.cfg', silent=True)
+app.config.from_pyfile('/etc/scs/storage/local.cfg', silent=True)
 
 def secure_name(value):
     return werkzeug.utils.secure_filename(value)
