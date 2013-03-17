@@ -46,6 +46,14 @@ def after_request(resp):
     resp.headers.add('elapsed', elapsed)
     return resp
 
+@app.route("/ping", methods = ["GET", "PUT"])
+def ping():
+   out='pong\n'
+   response = flask.make_response(out)
+   response.headers['status'] = 200
+   response.headers['content-type'] = 'text/plain'
+   return response
+
 @app.route("/<account>/<bucket>/<obj>", methods = ["GET", "PUT"])
 def object(account, bucket, obj):
 
