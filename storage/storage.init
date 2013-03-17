@@ -1,12 +1,22 @@
 #!/bin/bash
+### BEGIN INIT INFO
+# Provides:          scs-storage
+# Required-Start:    $local_fs $remote_fs $network $syslog
+# Required-Stop:     $local_fs $remote_fs $network $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# X-Interactive:     true
+# Short-Description: Start/stop Simple Cloud Storage Node
+### END INIT INFO
+
 case "$1" in
     start)
-        echo -n "Starting Simple Cloud Storage node"
+        echo -n "Starting Simple Cloud Storage Node"
         su - scs -c /srv/scs/storage/storage.py >> /var/log/scs/storage.log 2>&1 &
         echo " "
         ;;
     stop)
-        echo -n "Shutting down Simple Cloud Storage node"
+        echo -n "Shutting down Simple Cloud Storage Node"
         pkill -u scs -f "python /srv/scs/storage/storage.py"
         echo " "
         ;;
