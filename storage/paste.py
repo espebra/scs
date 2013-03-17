@@ -4,5 +4,5 @@ import paste
 from paste import httpserver
 from storage import app
 
-paste.httpserver.serve(app, host="0.0.0.0", port=1028)
+paste.httpserver.serve(app, host=app.config['HOST'], port=app.config['PORT'])
 
