@@ -1,0 +1,32 @@
+#!/bin/bash
+case "$1" in
+    start)
+        echo -n "Starting Simple Cloud Storage node"
+        su - scs -c /srv/scs/storage/storage.py >> /var/log/scs/storage.log 2>&1 &
+        echo " "
+        ;;
+    stop)
+        echo -n "Shutting down Simple Cloud Storage node"
+        pkill -u scs -f "python /srv/scs/storage/storage.py"
+        echo " "
+        ;;
+    restart)
+        $0 stop
+        $0 start
+        ;;
+    status)
+        pgrep -u scs -f "python /srv/scs/storage/storage.py"
+        if [ $? -eq 0 ]; then
+            echo "Running"
+            exit 0
+        else:
+            echo "Not running"
+            exit 3
+        fi
+        ;;
+    *)
+        ## If no parameters are given, print which are avaiable.
+        echo "Usage: $0 {start|stop|status|restart}"
+        exit 1
+        ;;
+esac
