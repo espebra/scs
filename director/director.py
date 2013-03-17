@@ -82,6 +82,7 @@ def get_object_status_on_nodes(nodes,account,bucket,obj):
 def get_object_status_on_node(node,account,bucket,obj,q = False):
 
     url = "http://%s/%s/%s/%s?info" % (node, account, bucket, obj)
+    code = 404
     try:
         conn = urllib2.urlopen(url, timeout = 1)
         code = conn.getcode()
@@ -189,15 +190,9 @@ def object(account, bucket, obj):
     # Get the nodes for this hash
     nodes = get_nodes(h, resources, replica_count, regions)
 
-    object_status = get_object_status_on_nodes(nodes,account,bucket,obj)
-
     url = None
     if len(nodes) > 0:
-        selected_node = select_node(object_status)
-        if selected_node:
-            url = "http://%s/%s/%s/%s" % (selected_node, account, bucket, obj)
-        else:
-            url = "http://%s/%s/%s/%s" % (random.choice(nodes), account, bucket, obj)
+        url = "http://%s/%s/%s/%s" % (random.choice(nodes), account, bucket, obj)
 
     if flask.request.method == 'PUT':
         if url:
@@ -209,6 +204,12 @@ def object(account, bucket, obj):
             return response
 
     elif flask.request.method == 'GET':
+    
+        object_status = get_object_status_on_nodes(nodes,account,bucket,obj)
+        if len(nodes) > 0:
+            selected_node = select_node(object_status)
+            if selected_node:
+                url = "http://%s/%s/%s/%s" % (selected_node, account, bucket, obj)
 
         if app.config['NODES']:
             out = ''

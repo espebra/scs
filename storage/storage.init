@@ -12,12 +12,12 @@
 case "$1" in
     start)
         echo -n "Starting Simple Cloud Storage Node"
-        su - scs -c /srv/scs/storage/tornado.py >> /var/log/scs/storage.log 2>&1 &
+        su - scs -c /srv/scs/storage/paste.py >> /var/log/scs/storage.log 2>&1 &
         echo " "
         ;;
     stop)
         echo -n "Shutting down Simple Cloud Storage Node"
-        pkill -u scs -f "python /srv/scs/storage/tornado.py"
+        pkill -u scs -f "python /srv/scs/storage/paste.py"
         echo " "
         ;;
     restart)
@@ -25,7 +25,7 @@ case "$1" in
         $0 start
         ;;
     status)
-        pgrep -u scs -f "python /srv/scs/storage/tornado.py"
+        pgrep -u scs -f "python /srv/scs/storage/paste.py"
         if [ $? -eq 0 ]; then
             echo "Running"
             exit 0
