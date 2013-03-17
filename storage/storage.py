@@ -92,7 +92,7 @@ def object(account, bucket, obj):
             try:
                 os.makedirs(dir_path)
             except:
-                app.logger.error("Unable to create the directory structure" % (dir_path))
+                app.logger.error("Unable to create the directory structure (%s)" % (dir_path))
                 flask.abort(500)
 
         # Copy the temp file to the target destination path

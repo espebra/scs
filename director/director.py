@@ -67,20 +67,33 @@ def get_consistent_hash_values(h,nodes,replicas = 2):
 
     return ret
 
-def get_object_status_on_nodes(nodes,account,bucket,obj):
+
+def query_storage_nodes(nodes,function,a):
     ret = {}
     q = Queue.Queue()
-
     for node in nodes:
-        threading.Thread(target=get_object_status_on_node, args=(node, account, bucket, obj, q)).start()
-        ret.update(q.get())
-
-    #time.sleep(1)
-    #print ret
+        threading.Thread(target=function, args=(node, q, a)).start()
+        ret[node] = q.get()
     return ret
 
-def get_object_status_on_node(node,account,bucket,obj,q = False):
+def get_node_status(node, q = False, a = None):
 
+    url = "http://%s/ping" % (node)
+    code = 404
+    try:
+        conn = urllib2.urlopen(url, timeout = 1)
+        code = conn.getcode()
+        conn.close()
+    except urllib2.HTTPError, e:
+        code = e.getcode()
+
+    q.put(code)
+
+def get_object_status_on_node(node, q = False, a = None):
+
+    account = a[0]
+    bucket  = a[1]
+    obj     = a[2]
     url = "http://%s/%s/%s/%s?info" % (node, account, bucket, obj)
     code = 404
     try:
@@ -90,10 +103,8 @@ def get_object_status_on_node(node,account,bucket,obj,q = False):
     except urllib2.HTTPError, e:
         code = e.getcode()
 
-    n = {}
-    n['code'] = code
     ret = {}
-    ret[node] = n
+    ret['code'] = code
     q.put(ret)
 
 def select_node(object_status):
@@ -195,6 +206,12 @@ def object(account, bucket, obj):
         url = "http://%s/%s/%s/%s" % (random.choice(nodes), account, bucket, obj)
 
     if flask.request.method == 'PUT':
+        #nodes_status = query_storage_nodes(nodes,get_node_status,None)
+
+        #for 
+        #    selected_node = get_available_node(nodes)
+        #    if selected_node:
+        #        url = "http://%s/%s/%s/%s" % (selected_node, account, bucket, obj)
         if url:
             # 307 Temporary Redirect
             # http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html
@@ -205,7 +222,9 @@ def object(account, bucket, obj):
 
     elif flask.request.method == 'GET':
     
-        object_status = get_object_status_on_nodes(nodes,account,bucket,obj)
+        object_status = query_storage_nodes( \
+            nodes,get_object_status_on_node,(account,bucket,obj))
+
         if len(nodes) > 0:
             selected_node = select_node(object_status)
             if selected_node:
