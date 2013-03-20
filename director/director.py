@@ -202,20 +202,20 @@ def object(account, bucket, obj):
     nodes = get_nodes(h, resources, replica_count, regions)
 
     url = None
+
+    # Find out what the http return codes are on this specific object, and use
+    # it to redirect the client to the correct storage node.
+    object_status = query_storage_nodes( \
+        nodes,get_object_status_on_node,(account,bucket,obj))
+
     if len(nodes) > 0:
-        url = "http://%s/%s/%s/%s" % (random.choice(nodes), account, bucket, obj)
+        selected_node = select_node(object_status)
+        if selected_node:
+            url = "http://%s/%s/%s/%s" % (selected_node, account, bucket, obj)
+        else:
+            url = "http://%s/%s/%s/%s" % (random.choice(nodes), account, bucket, obj)
 
     if flask.request.method == 'PUT':
-
-        # We should check the status of the nodes here, so that the client is
-        # redirected to an available node.
-        #nodes_status = query_storage_nodes(nodes,get_node_status,None)
-
-        #for 
-        #    selected_node = get_available_node(nodes)
-        #    if selected_node:
-        #        url = "http://%s/%s/%s/%s" % (selected_node, account, bucket, obj)
-
         if url:
             # 307 Temporary Redirect
             # http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html
@@ -225,17 +225,6 @@ def object(account, bucket, obj):
             return response
 
     elif flask.request.method == 'GET':
-    
-        # Find out what the http return codes are on this specific object, and use
-        # it to redirect the client to the correct storage node.
-        object_status = query_storage_nodes( \
-            nodes,get_object_status_on_node,(account,bucket,obj))
-
-        if len(nodes) > 0:
-            selected_node = select_node(object_status)
-            if selected_node:
-                url = "http://%s/%s/%s/%s" % (selected_node, account, bucket, obj)
-
         if app.config['NODES']:
             out = ''
             for node in nodes:
