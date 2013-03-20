@@ -120,9 +120,9 @@ def object(account, bucket, obj):
         else:
             code = 200
 
-        out = ''
         if app.config['INFO']:
             if code == 200:
+                out = ''
                 out += 'host = %s\n' % host
                 out += 'account = %s\n' % account
                 out += 'bucket = %s\n' % bucket
@@ -130,11 +130,13 @@ def object(account, bucket, obj):
                 out += 'path = %s\n' % file_path
                 out += 'mtime = %s\n' % st.st_mtime
                 out += 'size = %s\n' % st.st_size
+                response = flask.make_response(out)
+                response.headers['status'] = code
+                response.headers['content-type'] = 'text/plain'
+                return response
+            else:
+                flask.abort(404)
 
-            response = flask.make_response(out)
-            response.headers['status'] = code
-            response.headers['content-type'] = 'text/plain'
-            return response
         else:
             if code == 200:
                 response = flask.make_response( \
@@ -142,10 +144,7 @@ def object(account, bucket, obj):
                 #response.headers['cache-control'] = 'max-age=86400, must-revalidate'
                 return response
             else:
-                response = flask.make_response(out)
-                response.headers['status'] = code
-                response.headers['content-type'] = 'text/plain'
-                return response
+                flask.abort(404)
 
 
 if __name__ == '__main__':

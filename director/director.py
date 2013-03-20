@@ -161,7 +161,7 @@ def after_request(resp):
     app.config['TO'] = time.time()
     elapsed = app.config['TO'] - app.config['FROM']
     # TODO: May be logged and graphed (for SLA purposes)
-    resp.headers.add('elapsed', elapsed)
+    resp.headers.add('Elapsed', elapsed)
     return resp
 
 @app.route("/<account>/<bucket>")
