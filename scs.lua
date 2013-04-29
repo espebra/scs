@@ -33,7 +33,7 @@ local function verify_bucket(bucket)
     if #bucket > 40 then 
         return false 
     end
-    if not ngx.re.match(bucket, '^[a-zA-Z0-9]+$') then
+    if not ngx.re.match(bucket, '^[a-zA-Z0-9]+$','j') then
         return false 
     end
     return true
