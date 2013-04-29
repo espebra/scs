@@ -443,15 +443,13 @@ if string.len(object) == 0 then
     ngx.exit(400)
 end
 
+local exitcode = 500
+local msg = nil
+
 local method = ngx.var.request_method
 if method == 'HEAD' then
-    head_object(internal, bucket, object)
-end
-
-local exitcode = 0
-local msg = ""
-
-if method == "GET" then
+    exitcode, msg = head_object(internal, bucket, object)
+elseif method == "GET" then
     exitcode, msg = get_object(internal, bucket, object)
 elseif method == "POST" then
     exitcode, msg = post_object(internal, bucket, object)
