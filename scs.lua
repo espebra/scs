@@ -284,7 +284,7 @@ local function head_object(internal, bucket, object)
             msg = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts."
         else
             local url = generate_url(host,object)
-            msg = 'Redirecting HEAD request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url
+            msg = 'Redirecting HEAD request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. "."
             ngx.header["Location"] = url
             exitcode = 302
         end
@@ -323,7 +323,7 @@ local function get_object(internal, bucket, object)
                 local url = generate_url(host, object)
                 -- ngx.say("Host: " .. host)
                 -- ngx.say("Redirect to: " .. url)
-                msg = 'Redirecting GET request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url
+                msg = 'Redirecting GET request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. "."
                 ngx.header["Location"] = url
                 exitcode = 302
             else
@@ -418,45 +418,49 @@ local h = ngx.req.get_headers()
 local internal = is_internal_request(get_header('user-agent', h))
 local debug = get_header('x-debug', h)
 
+local exitcode = nil
+local msg = nil
+
 -- Return 200 immediately if the x-status header is set. This is to verify that
 -- the host is up and running.
 local status = get_header('x-status', h)
 if status and internal then
-    ngx.exit(200)
+    exitcode = 200
+    msg = "Returning 200 to the status check."
 end
 
 bucket = get_header('x-bucket',h)
 if not bucket then
-    -- ngx.say("Missing x-bucket header")
-    ngx.exit(400)
+    exitcode = 400
+    msg = "The request is missing the x-bucket header."
 end
 
 if not verify_bucket(bucket) then
-    -- ngx.say("Invalid bucket name")
-    ngx.exit(400)
+    exitcode = 400
+    msg = "Invalid bucket name (" .. bucket .. ")."
 end
 
 -- Read the object name, and remove the first char (which is a /)
 local object = string.sub(ngx.var.request_uri, 2)
 if string.len(object) == 0 then
-    -- ngx.say("Object name not set")
-    ngx.exit(400)
+    exitcode = 400
+    msg = "The object name is not set."
 end
 
-local exitcode = 500
-local msg = nil
-
-local method = ngx.var.request_method
-if method == 'HEAD' then
-    exitcode, msg = head_object(internal, bucket, object)
-elseif method == "GET" then
-    exitcode, msg = get_object(internal, bucket, object)
-elseif method == "POST" then
-    exitcode, msg = post_object(internal, bucket, object)
-elseif method == "PUT" then
-    exitcode, msg = put_object(internal, bucket, object)
-elseif method == "DELETE" then
-    exitcode, msg = delete_object(internal, bucket, object)
+-- If the preflight checks went OK, go on with the real work here
+if not exitcode then
+    local method = ngx.var.request_method
+    if method == 'HEAD' then
+        exitcode, msg = head_object(internal, bucket, object)
+    elseif method == "GET" then
+        exitcode, msg = get_object(internal, bucket, object)
+    elseif method == "POST" then
+        exitcode, msg = post_object(internal, bucket, object)
+    elseif method == "PUT" then
+        exitcode, msg = put_object(internal, bucket, object)
+    elseif method == "DELETE" then
+        exitcode, msg = delete_object(internal, bucket, object)
+    end
 end
 
 local after = ngx.now()
