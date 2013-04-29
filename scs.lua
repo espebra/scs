@@ -60,7 +60,7 @@ local function object_exists_on_remote_host(internal,host,bucket,object)
     headers['x-bucket'] = bucket
     headers['user-agent'] = "scs internal"
 
-    local res, err = http.request(host, 80, {
+    local res, err = http.request(host, config.bind_port, {
         method  = "HEAD",
         version = 0,
         path    = "/" .. object,
@@ -79,12 +79,21 @@ local function object_exists_on_remote_host(internal,host,bucket,object)
     return res.status
 end
 
+local function generate_url(host, object)
+    if config.bind_port == 80 then
+        local url = "http://" .. host .. "/" .. object
+    else
+        local url = "http://" .. host .. ":" .. config.bind_port .. "/" .. object
+    end
+    return url
+end
+
 local function remote_host_availability(host)
     headers = {}
     headers['x-status'] = true
     headers['user-agent'] = "scs internal"
 
-    local res, err = http.request(host, 80, {
+    local res, err = http.request(host, config.bind_port, {
         method  = "HEAD",
         version = 0,
         path    = "/",
@@ -254,9 +263,8 @@ end
 
 local function object_fits_on_this_host(bucket, object)
     local hosts = get_hosts(bucket, object)
-    local fqdn = os.execute("hostname --fqdn")
     for _,host in pairs(hosts) do
-        if fqdn == host then
+        if ngx.req.get_headers()["Host"] == host then
             return true
         end
     end
@@ -277,7 +285,7 @@ local function head_object(internal, bucket, object)
         if host == nil then
             ngx.exit(404)
         else
-            local url = "http://" .. host .. "/" .. object
+            local url = generate_url(host,object)
             ngx.redirect(url, ngx.HTTP_MOVED_TEMPORARILY)
         end
     end
@@ -315,7 +323,7 @@ local function get_object(internal, bucket, object)
         if host == nil then
             ngx.exit(404)
         else
-            local url = "http://" .. host .. "/" .. object
+            local url = generate_url(host, object)
             -- ngx.say("Host: " .. host)
             -- ngx.say("Redirect to: " .. url)
             ngx.redirect(url, ngx.HTTP_MOVED_TEMPORARILY)
@@ -327,7 +335,9 @@ local function get_object(internal, bucket, object)
     ngx.exit(404)
 end
 
-local function post_object(internal, bucket, object, req_body_file)
+local function post_object(internal, bucket, object)
+    ngx.req.read_body()
+    local req_body_file = ngx.req.get_body_file()
     if object_fits_on_this_host(bucket, object) then
         local path = config.storage_directory .. "/" ..  bucket
         local object_base64 = ngx.encode_base64(object)
@@ -337,7 +347,6 @@ local function post_object(internal, bucket, object, req_body_file)
         if not req_body_file then
             ngx.say('No file found in request')
             ngx.exit(403)
-            return
         end
         tmpfile = io.open(req_body_file)
         realfile = io.open(path .. "/" .. object_base64, 'w')
@@ -364,7 +373,7 @@ local function post_object(internal, bucket, object, req_body_file)
             ngx.exit(404)
         else
             -- Redirect to one of the corrent hosts here. 307.
-            local url = "http://" .. host .. "/" .. object
+            local url = generate_url(host, object)
             ngx.header["Location"] = url
             ngx.exit(307)
             --ngx.redirect(url, 307)
@@ -372,11 +381,13 @@ local function post_object(internal, bucket, object, req_body_file)
     end
 end
 
-local function put_object(internal, bucket, object, req_body_file)
+local function put_object(internal, bucket, object)
+    ngx.req.read_body()
+    local req_body_file = ngx.req.get_body_file()
     ngx.exit(200)
 end
 
-local function delete_object(internal, bucket, object, req_body_file)
+local function delete_object(internal, bucket, object)
     ngx.exit(200)
 end
 
@@ -392,12 +403,7 @@ end
 -- Global variable for easy access to the data from within functions
 config = get_configuration()
 
--- Read body from nginx so file is available for consumption
-ngx.req.read_body()
 local h = ngx.req.get_headers()
-
--- Check if the request is an internal scs request. Internal requests have 
--- the user-agent "scs internal" set. This is not a security feature.
 local internal = is_internal_request(get_header('user-agent', h))
 
 -- Return 200 immediately if the x-status header is set. This is to verify that
@@ -425,7 +431,6 @@ if string.len(object) == 0 then
     ngx.exit(400)
 end
 
--- Request routing
 local method = ngx.var.request_method
 if method == 'HEAD' then
     head_object(internal, bucket, object)
@@ -433,16 +438,11 @@ end
 
 if method == "GET" then
     get_object(internal, bucket, object)
-end
-
-if method == "POST" then
-    post_object(internal, bucket, object, ngx.req.get_body_file())
-end
- 
-if method == "PUT" then
-    put_object(internal, bucket, object, ngx.req.get_body_file())
-end
-
-if method == "DELETE" then
+elseif method == "POST" then
+    post_object(internal, bucket, object)
+elseif method == "PUT" then
+    put_object(internal, bucket, object)
+elseif method == "DELETE" then
     delete_object(internal, bucket, object)
 end
+

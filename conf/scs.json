@@ -39,5 +39,6 @@
     },
     "replica_sites": 2,
     "replicas_per_site": 2,
-    "storage_directory": "/srv/scs/files"
+    "storage_directory": "/srv/scs/files",
+    "bind_port": 80
 }
