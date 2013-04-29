@@ -396,10 +396,14 @@ config = get_configuration()
 ngx.req.read_body()
 local h = ngx.req.get_headers()
 
+-- Check if the request is an internal scs request. Internal requests have 
+-- the user-agent "scs internal" set. This is not a security feature.
+local internal = is_internal_request(get_header('user-agent', h))
+
 -- Return 200 immediately if the x-status header is set. This is to verify that
 -- the host is up and running.
 local status = get_header('x-status', h)
-if status then
+if status and internal then
     ngx.exit(200)
 end
 
@@ -414,8 +418,6 @@ if not verify_bucket(bucket) then
     ngx.exit(400)
 end
 
-local internal = is_internal_request(get_header('user-agent', h))
-
 -- Read the object name, and remove the first char (which is a /)
 local object = string.sub(ngx.var.request_uri, 2)
 if string.len(object) == 0 then
@@ -423,10 +425,8 @@ if string.len(object) == 0 then
     ngx.exit(400)
 end
 
--- local digest = string.sub(ngx.md5(bucket .. object),0,8)
--- local out = {}
+-- Request routing
 local method = ngx.var.request_method
-
 if method == 'HEAD' then
     head_object(internal, bucket, object)
 end
