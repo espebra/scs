@@ -319,15 +319,15 @@ local function get_object(internal, bucket, object)
             -- valid host to redirect to. 302.
             local host = get_host_with_object(bucket,object)
         
-            if not host == nil then
+            if host == nil then
+                msg = "The object " .. object .. " in bucket " .. bucket .. " was not found on any of the available replica hosts."
+            else
                 local url = generate_url(host, object)
                 -- ngx.say("Host: " .. host)
                 -- ngx.say("Redirect to: " .. url)
                 msg = 'Redirecting GET request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. "."
                 ngx.header["Location"] = url
                 exitcode = 302
-            else
-                msg = "The object " .. object .. " in bucket " .. bucket .. " was not found on any of the available replica hosts."
             end
         end
     end
