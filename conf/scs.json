@@ -1,0 +1,43 @@
+{
+    "hosts": {
+        "site1": [
+            "s1-host001.example.com",
+            "s1-host002.example.com",
+            "s1-host003.example.com",
+            "s1-host004.example.com",
+            "s1-host005.example.com",
+            "s1-host006.example.com",
+            "s1-host007.example.com",
+            "s1-host008.example.com",
+            "s1-host009.example.com",
+            "s1-host010.example.com"
+        ],
+        "site2": [
+            "s2-host001.example.com",
+            "s2-host002.example.com",
+            "s2-host003.example.com",
+            "s2-host004.example.com",
+            "s2-host005.example.com",
+            "s2-host006.example.com",
+            "s2-host007.example.com",
+            "s2-host008.example.com",
+            "s2-host009.example.com",
+            "s2-host010.example.com"
+        ],
+        "site3": [
+            "s3-host001.example.com",
+            "s3-host002.example.com",
+            "s3-host003.example.com",
+            "s3-host004.example.com",
+            "s3-host005.example.com",
+            "s3-host006.example.com",
+            "s3-host007.example.com",
+            "s3-host008.example.com",
+            "s3-host009.example.com",
+            "s3-host010.example.com"
+        ]
+    },
+    "replica_sites": 2,
+    "replicas_per_site": 2,
+    "storage_directory": "/srv/scs/files"
+}
