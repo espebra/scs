@@ -11,6 +11,12 @@ Features
 * Multi location
 * Eventual consistent (WIP)
 
+Design principles
+-----------------
+* Requests can be sent to any of the hosts. The requests will be redirected to one of the correct ones. This is suitable for anycast.
+* Automatic rebalancing if hosts are down is not necessary. It is sufficient to rebalance when hosts are added and/or removed from the configuration file.
+* Stateless is robust.
+
 Cloudy roadmap
 --------------
 
