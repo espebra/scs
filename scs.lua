@@ -265,9 +265,13 @@ local function object_fits_on_this_host(bucket, object)
 end
 
 local function head_object(internal, bucket, object)
+    local exitcode = 404
+    local msg = nil
+
     -- See if the object exists locally
     if object_exists_locally(bucket, object) then
-        ngx.exit(200)
+        exitcode = 200
+        msg = "The object " .. object .. " in bucket " .. bucket .. " exists locally."
     end
 
     -- The object do not exist locally
@@ -276,7 +280,8 @@ local function head_object(internal, bucket, object)
         local host = get_host_with_object(bucket,object)
     
         if host == nil then
-            ngx.exit(404)
+            exitcode = 404
+            msg = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts."
         else
             local url = generate_url(host,object)
             msg = 'Redirecting HEAD request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url
@@ -284,10 +289,7 @@ local function head_object(internal, bucket, object)
             exitcode = 302
         end
     end
-
-    -- The object do not exist locally, or on any of the hosts reported by the
-    -- hash table.
-    ngx.exit(404)
+    return exitcode, msg
 end
 
 local function get_object(internal, bucket, object)
@@ -329,9 +331,6 @@ local function get_object(internal, bucket, object)
             end
         end
     end
-
-    -- The object do not exist locally, or on any of the hosts reported by the
-    -- hash table.
     return exitcode, msg
 end
 
