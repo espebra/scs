@@ -1,13 +1,10 @@
 local http   = require "resty.http.simple"
 local cjson = require 'cjson'
 local Flexihash = require 'Flexihash'
-
---
--- Global functions
---
+local before = ngx.now()
 
 -- Return the value of a given request header, or nil if the header is not set
-function get_header(header,headers)
+local function get_header(header,headers)
     if headers[header] then
         return headers[header]
     end
@@ -15,7 +12,7 @@ function get_header(header,headers)
 end
 
 -- Check if a path is a file in the local file system
-function is_file(path)
+local function is_file(path)
    local f=io.open(path,"r")
    if f~=nil then 
        io.close(f) 
@@ -24,11 +21,6 @@ function is_file(path)
         return false 
     end
 end
-
-
---
--- Local functions
---
 
 -- Verify that the bucket name is valid
 local function verify_bucket(bucket)
@@ -80,10 +72,11 @@ local function object_exists_on_remote_host(internal,host,bucket,object)
 end
 
 local function generate_url(host, object)
+    local url
     if config.bind_port == 80 then
-        local url = "http://" .. host .. "/" .. object
+        url = "http://" .. host .. "/" .. object
     else
-        local url = "http://" .. host .. ":" .. config.bind_port .. "/" .. object
+        url = "http://" .. host .. ":" .. config.bind_port .. "/" .. object
     end
     return url
 end
@@ -286,7 +279,9 @@ local function head_object(internal, bucket, object)
             ngx.exit(404)
         else
             local url = generate_url(host,object)
-            ngx.redirect(url, ngx.HTTP_MOVED_TEMPORARILY)
+            msg = 'Redirecting HEAD request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url
+            ngx.header["Location"] = url
+            exitcode = 302
         end
     end
 
@@ -296,6 +291,8 @@ local function head_object(internal, bucket, object)
 end
 
 local function get_object(internal, bucket, object)
+    local exitcode = 404
+    local msg = nil
     -- See if the object exists locally
     if object_exists_locally(bucket, object) then
         -- We have the file locally. Serve it directly. 200.
@@ -311,31 +308,37 @@ local function get_object(internal, bucket, object)
             ngx.print(block)
         end
         fp:close()
-        ngx.exit(200)
-    end
-    
-    -- The object do not exist locally
-    if not internal then
-        -- We do not have the file locally. Should lookup the hash table to find a
-        -- valid host to redirect to. 302.
-        local host = get_host_with_object(bucket,object)
-    
-        if host == nil then
-            ngx.exit(404)
-        else
-            local url = generate_url(host, object)
-            -- ngx.say("Host: " .. host)
-            -- ngx.say("Redirect to: " .. url)
-            ngx.redirect(url, ngx.HTTP_MOVED_TEMPORARILY)
+        local msg = "Object " .. object .. " in bucket " .. bucket .. " delivered successfully to the client."
+        exitcode = 200
+    else
+        -- The object do not exist locally
+        if not internal then
+            -- We do not have the file locally. Should lookup the hash table to find a
+            -- valid host to redirect to. 302.
+            local host = get_host_with_object(bucket,object)
+        
+            if not host == nil then
+                local url = generate_url(host, object)
+                -- ngx.say("Host: " .. host)
+                -- ngx.say("Redirect to: " .. url)
+                msg = 'Redirecting GET request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url
+                ngx.header["Location"] = url
+                exitcode = 302
+            else
+                msg = "The object " .. object .. " in bucket " .. bucket .. " was not found on any of the available replica hosts."
+            end
         end
     end
 
     -- The object do not exist locally, or on any of the hosts reported by the
     -- hash table.
-    ngx.exit(404)
+    return exitcode, msg
 end
 
 local function post_object(internal, bucket, object)
+    local exitcode = 404
+    local msg = nil
+
     ngx.req.read_body()
     local req_body_file = ngx.req.get_body_file()
     if object_fits_on_this_host(bucket, object) then
@@ -345,8 +348,8 @@ local function post_object(internal, bucket, object)
             os.execute('mkdir -p ' .. path)
         end
         if not req_body_file then
-            ngx.say('No file found in request')
-            ngx.exit(403)
+            msg = 'No file found in request'
+            exitcode = 400
         end
         tmpfile = io.open(req_body_file)
         realfile = io.open(path .. "/" .. object_base64, 'w')
@@ -362,33 +365,42 @@ local function post_object(internal, bucket, object)
         realfile:close()
 
         if object_exists_locally(bucket,object) then
-            ngx.exit(200)
+            msg = 'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system.'
+            exitcode = 200
         else
-            ngx.exit(403)
+            msg = 'Failed to write object ' .. object .. ' in bucket ' .. bucket .. ' to local file system'
+            exitcode = 503
         end
     else
         local host = get_available_host(bucket,object)
         
         if host == nil then
-            ngx.exit(404)
+            msg = 'None of the hosts for object ' .. object .. ' in bucket ' .. bucket .. ' are available at the moment.'
+            exitcode = 503
         else
             -- Redirect to one of the corrent hosts here. 307.
             local url = generate_url(host, object)
             ngx.header["Location"] = url
-            ngx.exit(307)
+            msg = 'Redirecting POST request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url
+            exitcode = 307
             --ngx.redirect(url, 307)
         end
     end
+    return exitcode, msg
 end
 
 local function put_object(internal, bucket, object)
+    local msg
+    local exitcode=200
     ngx.req.read_body()
     local req_body_file = ngx.req.get_body_file()
-    ngx.exit(200)
+    return exitcode, msg
 end
 
 local function delete_object(internal, bucket, object)
-    ngx.exit(200)
+    local msg
+    local exitcode=200
+    return exitcode, msg
 end
 
 local function is_internal_request(useragent)
@@ -405,6 +417,7 @@ config = get_configuration()
 
 local h = ngx.req.get_headers()
 local internal = is_internal_request(get_header('user-agent', h))
+local debug = get_header('x-debug', h)
 
 -- Return 200 immediately if the x-status header is set. This is to verify that
 -- the host is up and running.
@@ -436,13 +449,25 @@ if method == 'HEAD' then
     head_object(internal, bucket, object)
 end
 
+local exitcode = 0
+local msg = ""
+
 if method == "GET" then
-    get_object(internal, bucket, object)
+    exitcode, msg = get_object(internal, bucket, object)
 elseif method == "POST" then
-    post_object(internal, bucket, object)
+    exitcode, msg = post_object(internal, bucket, object)
 elseif method == "PUT" then
-    put_object(internal, bucket, object)
+    exitcode, msg = put_object(internal, bucket, object)
 elseif method == "DELETE" then
-    delete_object(internal, bucket, object)
+    exitcode, msg = delete_object(internal, bucket, object)
 end
 
+local after = ngx.now()
+if debug then
+    if msg then
+        ngx.log(ngx.ERR, "Req time: " .. after-before .. " sec. " .. msg)
+    else
+        ngx.log(ngx.ERR, "Req time: " .. after-before .. " sec. No message.")
+    end
+end
+ngx.exit(exitcode)
