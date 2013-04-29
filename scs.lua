@@ -429,20 +429,24 @@ if status and internal then
     msg = "Returning 200 to the status check."
 end
 
-bucket = get_header('x-bucket',h)
-if not bucket then
+local bucket = get_header('x-bucket',h)
+if not status and not bucket then
     exitcode = 400
     msg = "The request is missing the x-bucket header."
 end
 
-if not verify_bucket(bucket) then
+if not status and not verify_bucket(bucket) then
     exitcode = 400
-    msg = "Invalid bucket name (" .. bucket .. ")."
+    if bucket == nil then
+        msg = "Invalid bucket name."
+    else
+        msg = "Invalid bucket name (" .. bucket .. ")."
+    end
 end
 
 -- Read the object name, and remove the first char (which is a /)
 local object = string.sub(ngx.var.request_uri, 2)
-if string.len(object) == 0 then
+if not status and string.len(object) == 0 then
     exitcode = 400
     msg = "The object name is not set."
 end
