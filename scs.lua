@@ -56,19 +56,18 @@ local function object_exists_on_remote_host(internal,host,bucket,object)
         method  = "HEAD",
         version = 0,
         path    = "/" .. object,
-        timeout = 200,
+        timeout = 500,
         headers = headers
     })
     if not res then
         -- ngx.say("http failure: ", err)
         return nil
     end
-    -- if res.status >= 200 and res.status < 300 then
-    --   ngx.say("My IP is: " .. res.body)
-    -- else
-    --   ngx.say("Query returned a non-200 response: " .. res.status)
-    -- end
-    return res.status
+    if res.status >= 200 and res.status < 300 then
+        return true
+    else
+        return false
+    end
 end
 
 local function generate_url(host, object)
@@ -90,7 +89,7 @@ local function remote_host_availability(host)
         method  = "HEAD",
         version = 0,
         path    = "/",
-        timeout = 200,
+        timeout = 500,
         headers = headers
     })
     if not res then
@@ -191,9 +190,7 @@ local function get_host_with_object(hosts, bucket, object)
     for _,host in pairs(hosts) do
         status = object_exists_on_remote_host(true,host,bucket,object)
         if status then
-            if status == 200 then
-                return host
-            end
+            return host
         end
     end
 
@@ -501,7 +498,7 @@ if debug then
     if msg then
         ngx.log(ngx.ERR, "Req time: " .. after-before .. " sec. " .. msg)
     else
-        ngx.log(ngx.ERR, "Req time: " .. after-before .. " sec. No message.")
+        ngx.log(ngx.ERR, "Req time: " .. after-before .. " sec. No message")
     end
 end
 ngx.exit(exitcode)
