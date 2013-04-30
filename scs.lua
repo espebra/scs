@@ -257,7 +257,7 @@ end
 local function object_fits_on_this_host(bucket, object)
     local hosts = get_hosts(bucket, object)
     for _,host in pairs(hosts) do
-        if ngx.req.get_headers()["Host"] == host then
+        if ngx.var.hostname == host then
             return true
         end
     end
