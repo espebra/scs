@@ -176,9 +176,7 @@ end
 
 -- Figure out exactly which host to use from the hosts given from the hash
 -- ring lookup,
-local function get_host_with_object(bucket, object)
-    local hosts = get_hosts(bucket, object)
-
+local function get_host_with_object(hosts, bucket, object)
     -- Randomize the hosts table
     -- backwards
     for i = #hosts, 2, -1 do
@@ -203,8 +201,7 @@ local function get_host_with_object(bucket, object)
     return nil
 end
 
-local function get_available_host(bucket, object)
-    local hosts = get_hosts(bucket, object)
+local function get_available_host(hosts)
 
     -- Randomize the hosts table
     -- backwards
@@ -254,10 +251,9 @@ local function get_configuration()
     return conf
 end
 
-local function object_fits_on_this_host(bucket, object)
-    local hosts = get_hosts(bucket, object)
+local function object_fits_on_this_host(hosts)
     for _,host in pairs(hosts) do
-        if ngx.var.hostname == host then
+        if ngx.req.get_headers()["Host"] == host then
             return true
         end
     end
@@ -277,14 +273,23 @@ local function head_object(internal, bucket, object)
     -- The object do not exist locally
     if not internal then
         -- Redirect to another host if this is not an internal request
-        local host = get_host_with_object(bucket,object)
+        local hosts = get_hosts(bucket, object)
+        local host = get_host_with_object(hosts, bucket, object)
+
+        -- Easier to understand what is happening when debugging
+        local hosts_text = "["
+        for _,host in pairs(hosts) do
+            hosts_text = hosts_text .. " " .. host 
+        end
+        hosts_text = hosts_text .. " ]"
     
         if host == nil then
+
+            msg = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts " .. hosts_text
             exitcode = 404
-            msg = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts."
         else
             local url = generate_url(host,object)
-            msg = 'Redirecting HEAD request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. "."
+            msg = 'Redirecting HEAD request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
             ngx.header["Location"] = url
             exitcode = 302
         end
@@ -317,15 +322,23 @@ local function get_object(internal, bucket, object)
         if not internal then
             -- We do not have the file locally. Should lookup the hash table to find a
             -- valid host to redirect to. 302.
-            local host = get_host_with_object(bucket,object)
+            local hosts = get_hosts(bucket, object)
+            local host = get_host_with_object(hosts, bucket, object)
+
+            -- Easier to understand what is happening when debugging
+            local hosts_text = "["
+            for _,host in pairs(hosts) do
+                hosts_text = hosts_text .. " " .. host 
+            end
+            hosts_text = hosts_text .. " ]"
         
             if host == nil then
-                msg = "The object " .. object .. " in bucket " .. bucket .. " was not found on any of the available replica hosts."
+                msg = "The object " .. object .. " in bucket " .. bucket .. " was not found on any of the available replica hosts " .. hosts_text
             else
                 local url = generate_url(host, object)
                 -- ngx.say("Host: " .. host)
                 -- ngx.say("Redirect to: " .. url)
-                msg = 'Redirecting GET request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. "."
+                msg = 'Redirecting GET request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
                 ngx.header["Location"] = url
                 exitcode = 302
             end
@@ -335,23 +348,33 @@ local function get_object(internal, bucket, object)
 end
 
 local function post_object(internal, bucket, object)
+    local hosts = get_hosts(bucket,object)
     local exitcode = 404
     local msg = nil
 
-    ngx.req.read_body()
-    local req_body_file = ngx.req.get_body_file()
-    if object_fits_on_this_host(bucket, object) then
-        local path = config.storage_directory .. "/" ..  bucket
+    if object_fits_on_this_host(hosts) then
         local object_base64 = ngx.encode_base64(object)
+        local path = config.storage_directory .. "/" ..  bucket
         if not os.rename(path, path) then
             os.execute('mkdir -p ' .. path)
         end
+
+        ngx.req.read_body()
+        local req_body_file = ngx.req.get_body_file()
+
         if not req_body_file then
             msg = 'No file found in request'
             exitcode = 400
         end
+
+        if req_body_file == nil then
+            msg = 'Request body is nil'
+            exitcode = 400
+        end
+
         tmpfile = io.open(req_body_file)
         realfile = io.open(path .. "/" .. object_base64, 'w')
+
         local size = 2^13      -- good buffer size (8K)
         while true do
             local block = tmpfile:read(size)
@@ -371,24 +394,30 @@ local function post_object(internal, bucket, object)
             exitcode = 503
         end
     else
-        local host = get_available_host(bucket,object)
+        local host = get_available_host(hosts)
+
+        -- Easier to understand what is happening when debugging
+        local hosts_text = "["
+        for _,host in pairs(hosts) do
+            hosts_text = hosts_text .. " " .. host 
+        end
+        hosts_text = hosts_text .. " ]"
         
         if host == nil then
-            msg = 'None of the hosts for object ' .. object .. ' in bucket ' .. bucket .. ' are available at the moment.'
+            msg = 'None of the hosts for object ' .. object .. ' in bucket ' .. bucket .. ' are available at the moment ' .. hosts_text
             exitcode = 503
         else
             -- Redirect to one of the corrent hosts here. 307.
             local url = generate_url(host, object)
             ngx.header["Location"] = url
-            msg = 'Redirecting POST request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url
+            msg = 'Redirecting POST request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
             exitcode = 307
-            --ngx.redirect(url, 307)
         end
     end
     return exitcode, msg
 end
 
-local function put_object(internal, bucket, object)
+local function put_object(internal, bucket, object, req_body_file)
     local msg
     local exitcode=200
     ngx.req.read_body()
