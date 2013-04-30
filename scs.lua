@@ -303,7 +303,7 @@ local function get_object(internal, bucket, object)
     -- See if the object exists locally
     if object_exists_locally(bucket, object) then
         -- We have the file locally. Serve it directly. 200.
-        ngx.header["content-disposition"] = "attachment; filename=" .. bucket .. "/" .. object;
+        ngx.header["content-disposition"] = "attachment; filename=" .. object;
         local object_base64 = ngx.encode_base64(object)
         local path = config.storage_directory .. "/" ..  bucket
         local fp = io.open(path .. "/" .. object_base64, 'r')
