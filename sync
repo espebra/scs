@@ -53,16 +53,22 @@ local function get_local_objects()
         for k,value in pairs(entry) do
             print("k: " .. k .. ", value: " .. value)
         end
+        local res = scs.sync_object("/srv/files", "lab-c.i.bitbit.net", entry['bucket'], entry['object_base64'])
+        if res then
+            print "Yes"
+        else
+            print "No"
+        end
     end
     return objects
 end
 
 local objects = get_local_objects()
-for i,object in pairs(objects) do
-    print("i: " .. i .. ", object: " .. object)
-    -- local objects = get_objects_in_bucket(bucket)
-    -- for j,object in pairs(objects) do
-    --     print(" j: " .. j .. ", o: " .. object)
-    -- end
-end
+-- for i,object in pairs(objects) do
+--     print("i: " .. i .. ", object: " .. object)
+--     -- local objects = get_objects_in_bucket(bucket)
+--     -- for j,object in pairs(objects) do
+--     --     print(" j: " .. j .. ", o: " .. object)
+--     -- end
+-- end
 

@@ -133,3 +133,13 @@ function look_up_hash_map(hash, hash_map, replicas)
     return result
 end
 
+function sync_object(dir, host, bucket, object_base64)
+    --local cmd="/usr/bin/rsync -zSut " .. dir .. "/" .. bucket .. "/" .. object_base64 .. " rsync://" .. host .. "/scs/" .. bucket .. "/" .. object_base64
+    local cmd="/usr/bin/rsync -zSut " .. dir .. "/" .. bucket .. "/" .. object_base64 .. " rsync://" .. host .. "/scs/" .. bucket .. "/"
+    local res = os.execute(cmd)
+    if res == 0 then
+        return true
+    else
+        return false
+    end
+end
