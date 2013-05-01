@@ -1,11 +1,9 @@
-local http = require "resty.http.simple"
-local cjson = require "cjson"
-local Flexihash = require 'Flexihash'
-
 module(..., package.seeall)
+local Flexihash = require 'Flexihash'
 
 local function read_configuration_file(path, required)
     -- Read the current configuration
+    local cjson = require "cjson"
     local f
     io.open(path, "r")
     if required then
@@ -46,6 +44,7 @@ end
 
 -- Check if an object exists on a remote host
 function object_exists_on_remote_host(internal,host,port,bucket,object)
+    local http = require "resty.http.simple"
     headers = {}
     headers['x-bucket'] = bucket
     headers['user-agent'] = "scs internal"
@@ -69,6 +68,7 @@ function object_exists_on_remote_host(internal,host,port,bucket,object)
 end
 
 function remote_host_availability(host, port)
+    local http = require "resty.http.simple"
     headers = {}
     headers['x-status'] = true
     headers['user-agent'] = "scs internal"

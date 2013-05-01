@@ -20,7 +20,7 @@ local tostring = tostring
 -- base64
 --------------------------------------------------------------------------------
 
-module( 'base64' )
+module(...)
 _VERSION = '1.0'
 
 local self = setmetatable( _M, {} )

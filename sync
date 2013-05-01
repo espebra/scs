@@ -7,6 +7,22 @@ local function base64_decode(s)
     return base64(s)
 end
 
+local function verify_bucket(bucket)
+    if not bucket then
+        return false
+    end
+    if #bucket < 3 then
+        return false
+    end
+    if #bucket > 40 then
+        return false
+    end
+    if not string.match(bucket, '^[a-zA-Z0-9]+$') then
+        return false
+    end
+    return true
+end
+
 -- Lua implementation of PHP scandir function
 local function scandir(directory)
     local i, t, popen = 0, {}, io.popen
@@ -39,22 +55,6 @@ local function get_local_objects()
         end
     end
     return objects
-end
-
-local function verify_bucket(bucket)
-    if not bucket then
-        return false
-    end
-    if #bucket < 3 then
-        return false
-    end
-    if #bucket > 40 then
-        return false
-    end
-    if not string.match(bucket, '^[a-zA-Z0-9]+$') then
-        return false
-    end
-    return true
 end
 
 local objects = get_local_objects()
