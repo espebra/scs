@@ -1,6 +1,6 @@
 local scs = require "libs.scslib"
-local http = require "libs.resty.http.simple"
-local Flexihash = require 'libs.Flexihash'
+--local http = require "libs.resty.http.simple"
+--local Flexihash = require 'libs.Flexihash'
 local cjson = require 'cjson'
 
 -- Verify that the bucket name is valid

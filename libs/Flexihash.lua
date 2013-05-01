@@ -2,7 +2,7 @@
 
 --Flexihash - A simple consistent hashing implementation for Lua.
 
-module('Flexihash', package.seeall)
+module(..., package.seeall)
 
 Flexihash_Crc32Hasher = {
 	hash = function(string) return ngx.crc32_short(string) end
