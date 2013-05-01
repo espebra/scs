@@ -20,54 +20,54 @@ local function verify_bucket(bucket)
     return true
 end
 
+-- Return a table with the hosts at a specific site  where a given object fits 
+-- according to the hash ring.
+local function get_replica_site_hosts(bucket, object, site) 
+    -- Try to read the hash map from shared memory
+    local hash_map = ngx.shared[site]
+    if not hash_map then
+        -- If the hash map does not exist, create it and store it for later use
+        hash_map = scs.create_hash_map(config.current.hosts[site])
+        ngx.shared[site] = hash_map
+    end
+    -- Now we have a hash map, either created or read from memory. Use it to
+    -- figure out which hosts to use for this object.
+    local hash = bucket .. object
+    local replicas = config.current.replicas_per_site
+    local result = scs.look_up_hash_map(hash, hash_map, replicas)
+    return result
+end
+
+-- Return a table with the hosts and sites where a given object fits
+-- according to the hash ring.
+local function get_replica_hosts(bucket, object, sites)
+    local hosts = {}
+    for _,site in pairs(sites) do
+        local result = get_replica_site_hosts(bucket, object, site)
+        for _, host in pairs(result) do
+            table.insert(hosts, host)
+        end
+    end
+    return hosts
+end
+
 -- Return a table with the sites where a given object fits according to the
 -- hash ring.
-local function get_sites(bucket, object)
+local function get_replica_sites(bucket, object)
     -- Try to read the hash map from shared memory
-    local site_hash_map = ngx.shared.sites
-    if not site_hash_map then
+    local hash_map = ngx.shared.sites
+    if not hash_map then
         -- If the hash map does not exist, create it and store it for later use
         local sites = scs.get_all_sites(config)
-        site_hash_map = scs.create_hash_map(sites)
+        hash_map = scs.create_hash_map(sites)
         ngx.shared.sites = site_hash_map
     end
     -- Now we have a hash map, either created or read from memory. Use it to
     -- figure out which sites to use for this object.
-    local h = bucket .. object
-    local result = site_hash_map:lookupList(h, config.current.replica_sites)
+    local hash = bucket .. object
+    local replicas = config.current.replica_sites
+    local result = scs.look_up_hash_map(hash, hash_map, replicas)
     return result
-end
-
--- Return a table with the hosts at a specific site  where a given object fits 
--- according to the hash ring.
-local function get_site_hosts(site, bucket, object) 
-    -- Try to read the hash map from shared memory
-    local map = ngx.shared[site]
-    if not map then
-        -- If the hash map does not exist, create it and store it for later use
-        map = scs.create_hash_map(config.current.hosts[site])
-        ngx.shared[site] = map
-    end
-    -- Now we have a hash map, either created or read from memory. Use it to
-    -- figure out which hosts to use for this object.
-    local h = bucket .. object
-    local result = map:lookupList(h, config.current.replicas_per_site)
-    return result
-end
-
--- Return a table with the hosts and sites where a given object fits 
--- according to the hash ring.
-local function get_hosts(bucket, object)
-    local h = bucket .. object
-    local sites = get_sites(bucket, object)
-    local hosts = {}
-    for _,site in pairs(sites) do 
-        local result = get_site_hosts(site, bucket, object)
-        for _, host in pairs(result) do
-            table.insert(hosts, host)
-        end
-    end 
-    return hosts
 end
 
 -- Figure out exactly which host to use from the hosts given from the hash
@@ -157,7 +157,8 @@ local function head_object(internal, bucket, object)
     -- The object do not exist locally
     if not internal then
         -- Redirect to another host if this is not an internal request
-        local hosts = get_hosts(bucket, object)
+        local sites = get_replica_sites(bucket, object)
+        local hosts = get_replica_hosts(bucket, object, sites)
         local host = get_host_with_object(hosts, bucket, object)
 
         -- Easier to understand what is happening when debugging
@@ -206,9 +207,10 @@ local function get_object(internal, bucket, object)
     else
         -- The object do not exist locally
         if not internal then
-            -- We do not have the file locally. Should lookup the hash table to find a
-            -- valid host to redirect to. 302.
-            local hosts = get_hosts(bucket, object)
+            -- We do not have the file locally. Should lookup the hash table to
+            -- find a valid host to redirect to. 302.
+            local sites = get_replica_sites(bucket, object)
+            local hosts = get_replica_hosts(bucket, object, sites)
             local host = get_host_with_object(hosts, bucket, object)
 
             -- Easier to understand what is happening when debugging
@@ -235,7 +237,8 @@ local function get_object(internal, bucket, object)
 end
 
 local function post_object(internal, bucket, object)
-    local hosts = get_hosts(bucket,object)
+    local sites = get_replica_sites(bucket, object)
+    local hosts = get_replica_hosts(bucket, object, sites)
     local exitcode = 404
     local msg = nil
 

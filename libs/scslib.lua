@@ -126,3 +126,10 @@ function get_all_sites(config)
     return sites
 end
 
+-- Return a table with the sites where a given object fits according to the
+-- hash ring.
+function look_up_hash_map(hash, hash_map, replicas)
+    local result = hash_map:lookupList(hash, replicas)
+    return result
+end
+
