@@ -1,0 +1,68 @@
+#!/usr/bin/env lua
+
+local base64 = require 'libs.base64'
+local scs = require 'libs.scslib'
+
+local function base64_decode(s)
+    return base64(s)
+end
+
+-- Lua implementation of PHP scandir function
+local function scandir(directory)
+    local i, t, popen = 0, {}, io.popen
+    -- for filename in popen('ls "'..directory..'"'):lines() do
+    for entry in popen('find ' .. directory .. ' -type f -printf "%T@\t%P\n" | sort -nr'):lines() do
+        -- print(entry)
+        local n = {}
+        n['epoch'] = string.match(entry,'^([^\t]+)\t[^\/]+\/.*$')
+        n['bucket'] = string.match(entry,'^[^\t]+\t([^\/]+)\/(.*)$')
+        n['object_base64'] = string.match(entry,'^[^\t]+\t[^\/]+\/(.*)$')
+        n['object'] = base64_decode(n['object_base64'])
+
+        if n['epoch'] and verify_bucket(n['bucket']) and n['object_base64'] then
+            i = i + 1
+            t[i] = n
+        end
+    end
+    return t
+end
+
+local function get_local_objects()
+    local path = "/srv/files"
+    local entries = scandir(path)
+    local objects = {}
+    
+    for i,entry in pairs(entries) do
+        print("i: " .. i)
+        for k,value in pairs(entry) do
+            print("k: " .. k .. ", value: " .. value)
+        end
+    end
+    return objects
+end
+
+local function verify_bucket(bucket)
+    if not bucket then
+        return false
+    end
+    if #bucket < 3 then
+        return false
+    end
+    if #bucket > 40 then
+        return false
+    end
+    if not string.match(bucket, '^[a-zA-Z0-9]+$') then
+        return false
+    end
+    return true
+end
+
+local objects = get_local_objects()
+for i,object in pairs(objects) do
+    print("i: " .. i .. ", object: " .. object)
+    -- local objects = get_objects_in_bucket(bucket)
+    -- for j,object in pairs(objects) do
+    --     print(" j: " .. j .. ", o: " .. object)
+    -- end
+end
+
