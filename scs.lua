@@ -494,11 +494,14 @@ if not exitcode then
 end
 
 local after = ngx.now()
+local elapsed = after - before
+ngx.header["x-elapsed"] = elapsed
+
 if debug then
     if msg then
-        ngx.log(ngx.ERR, "Req time: " .. after-before .. " sec. " .. msg)
+        ngx.log(ngx.ERR, "Req time: " .. elapsed .. " sec. " .. msg)
     else
-        ngx.log(ngx.ERR, "Req time: " .. after-before .. " sec. No message")
+        ngx.log(ngx.ERR, "Req time: " .. elapsed .. " sec. No message")
     end
 end
 ngx.exit(exitcode)
