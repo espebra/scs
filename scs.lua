@@ -1,26 +1,7 @@
-local http   = require "resty.http.simple"
+local scs = require "libs.scslib"
+local http = require "resty.http.simple"
 local cjson = require 'cjson'
 local Flexihash = require 'Flexihash'
-local before = ngx.now()
-
--- Return the value of a given request header, or nil if the header is not set
-local function get_header(header,headers)
-    if headers[header] then
-        return headers[header]
-    end
-    return nil
-end
-
--- Check if a path is a file in the local file system
-local function is_file(path)
-   local f=io.open(path,"r")
-   if f~=nil then 
-       io.close(f) 
-       return true 
-    else 
-        return false 
-    end
-end
 
 -- Verify that the bucket name is valid
 local function verify_bucket(bucket)
@@ -39,90 +20,6 @@ local function verify_bucket(bucket)
     return true
 end
 
--- Check if an object exists in the local file system
-local function object_exists_locally(bucket,object)
-   local object_base64 = ngx.encode_base64(object)
-   local path = config.storage_directory .. "/" ..  bucket .. "/" .. object_base64
-   return is_file(path)
-end
-
--- Check if an object exists on a remote host
-local function object_exists_on_remote_host(internal,host,bucket,object)
-    headers = {}
-    headers['x-bucket'] = bucket
-    headers['user-agent'] = "scs internal"
-
-    local res, err = http.request(host, config.bind_port, {
-        method  = "HEAD",
-        version = 0,
-        path    = "/" .. object,
-        timeout = 500,
-        headers = headers
-    })
-    if not res then
-        -- ngx.say("http failure: ", err)
-        return nil
-    end
-    if res.status >= 200 and res.status < 300 then
-        return true
-    else
-        return false
-    end
-end
-
-local function generate_url(host, object)
-    local url
-    if config.bind_port == 80 then
-        url = "http://" .. host .. "/" .. object
-    else
-        url = "http://" .. host .. ":" .. config.bind_port .. "/" .. object
-    end
-    return url
-end
-
-local function remote_host_availability(host)
-    headers = {}
-    headers['x-status'] = true
-    headers['user-agent'] = "scs internal"
-
-    local res, err = http.request(host, config.bind_port, {
-        method  = "HEAD",
-        version = 0,
-        path    = "/",
-        timeout = 500,
-        headers = headers
-    })
-    if not res then
-        return nil
-    end
-    if res.status >= 200 and res.status < 300 then
-        return true
-    else
-        return false
-    end
-end
-
--- Create a consistent hash of the values given in a table
-local function create_hash_map(values)
-    local hash_map = Flexihash.New()
-    local i = ""
-    for _,value in pairs(values) do 
-        hash_map:addTarget(value)
-        i = i .. " " .. value
-    end 
-    ngx.log(ngx.DEBUG, "Created hash map of [" .. i .. " ]")
-    return hash_map
-end
-
--- Return a table containing the sites in the configuration
-local function get_all_sites()
-    local sites = {}
-    for site,_ in pairs(config.hosts) do
-        table.insert(sites,site)
-    end
-    return sites
-end
-
 -- Return a table with the sites where a given object fits according to the
 -- hash ring.
 local function get_sites(bucket, object)
@@ -130,14 +27,14 @@ local function get_sites(bucket, object)
     local site_hash_map = ngx.shared.sites
     if not site_hash_map then
         -- If the hash map does not exist, create it and store it for later use
-        local sites = get_all_sites()
-        site_hash_map = create_hash_map(sites)
+        local sites = scs.get_all_sites(config)
+        site_hash_map = scs.create_hash_map(sites)
         ngx.shared.sites = site_hash_map
     end
     -- Now we have a hash map, either created or read from memory. Use it to
     -- figure out which sites to use for this object.
     local h = bucket .. object
-    local result = site_hash_map:lookupList(h, config.replica_sites)
+    local result = site_hash_map:lookupList(h, config.current.replica_sites)
     return result
 end
 
@@ -148,13 +45,13 @@ local function get_site_hosts(site, bucket, object)
     local map = ngx.shared[site]
     if not map then
         -- If the hash map does not exist, create it and store it for later use
-        map = create_hash_map(config.hosts[site])
+        map = scs.create_hash_map(config.current.hosts[site])
         ngx.shared[site] = map
     end
     -- Now we have a hash map, either created or read from memory. Use it to
     -- figure out which hosts to use for this object.
     local h = bucket .. object
-    local result = map:lookupList(h, config.replicas_per_site)
+    local result = map:lookupList(h, config.current.replicas_per_site)
     return result
 end
 
@@ -188,7 +85,8 @@ local function get_host_with_object(hosts, bucket, object)
     -- For each host, check if the object is available. Return the first
     -- host that has the object available.
     for _,host in pairs(hosts) do
-        status = object_exists_on_remote_host(true,host,bucket,object)
+        local port = config.current.bind_port
+        status = scs.object_exists_on_remote_host(true,host,port,bucket,object)
         if status then
             return host
         end
@@ -199,7 +97,6 @@ local function get_host_with_object(hosts, bucket, object)
 end
 
 local function get_available_host(hosts)
-
     -- Randomize the hosts table
     -- backwards
     for i = #hosts, 2, -1 do
@@ -211,8 +108,9 @@ local function get_available_host(hosts)
 
     -- For each host, check if the object is available. Return the first
     -- host that has the object available.
+    local port = config.current.bind_port
     for _,host in pairs(hosts) do
-        status = remote_host_availability(host)
+        status = scs.remote_host_availability(host, port)
         if status then
             return host
         end
@@ -223,28 +121,15 @@ local function get_available_host(hosts)
 end
 
 -- Read the configuration
-local function get_configuration()
+local function get_cached_configuration()
     -- Try to read the configuration from the shared memory
     local conf = ngx.shared.conf
     if not conf then
-        -- Unable to read configuration from the shared memory. Will read it
-        -- from the file system and store it in shared memory for later use.
-        local path = "conf/scs.json"
-        local f = assert(io.open(path, "r"))
-        local c = f:read("*all")
-        f:close()
-
-        -- Override the default configuration here
-        local path = "/etc/scs/scs.json"
-        if is_file(path) then
-            f = assert(io.open(path, "r"))
-            c = f:read("*all")
-            f:close()
-        end
-    
-        conf = cjson.decode(c)
+        conf = scs.get_configuration()
         ngx.shared.conf = conf
+        ngx.log(ngx.ERR, "Caching configuration")
     end
+
     return conf
 end
 
@@ -262,7 +147,9 @@ local function head_object(internal, bucket, object)
     local msg = nil
 
     -- See if the object exists locally
-    if object_exists_locally(bucket, object) then
+    local object_base64 = ngx.encode_base64(object)
+    local dir = config.current.storage_directory
+    if scs.object_exists_locally(dir, bucket, object_base64) then
         exitcode = 200
         msg = "The object " .. object .. " in bucket " .. bucket .. " exists locally."
     end
@@ -285,7 +172,8 @@ local function head_object(internal, bucket, object)
             msg = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts " .. hosts_text
             exitcode = 404
         else
-            local url = generate_url(host,object)
+            local port = config.current.bind_port
+            local url = scs.generate_url(host,port,object)
             msg = 'Redirecting HEAD request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
             ngx.header["Location"] = url
             exitcode = 302
@@ -298,11 +186,12 @@ local function get_object(internal, bucket, object)
     local exitcode = 404
     local msg = nil
     -- See if the object exists locally
-    if object_exists_locally(bucket, object) then
+    local object_base64 = ngx.encode_base64(object)
+    local dir = config.current.storage_directory
+    if scs.object_exists_locally(dir, bucket, object_base64) then
         -- We have the file locally. Serve it directly. 200.
         ngx.header["content-disposition"] = "attachment; filename=" .. object;
-        local object_base64 = ngx.encode_base64(object)
-        local path = config.storage_directory .. "/" ..  bucket
+        local path = config.current.storage_directory .. "/" ..  bucket
         local fp = io.open(path .. "/" .. object_base64, 'r')
         local size = 2^13      -- good buffer size (8K)
         -- Stream the contents of the file to the client
@@ -332,7 +221,8 @@ local function get_object(internal, bucket, object)
             if host == nil then
                 msg = "The object " .. object .. " in bucket " .. bucket .. " was not found on any of the available replica hosts " .. hosts_text
             else
-                local url = generate_url(host, object)
+                local port = config.current.bind_port
+                local url = scs.generate_url(host,port,object)
                 -- ngx.say("Host: " .. host)
                 -- ngx.say("Redirect to: " .. url)
                 msg = 'Redirecting GET request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
@@ -351,7 +241,7 @@ local function post_object(internal, bucket, object)
 
     if object_fits_on_this_host(hosts) then
         local object_base64 = ngx.encode_base64(object)
-        local path = config.storage_directory .. "/" ..  bucket
+        local path = config.current.storage_directory .. "/" ..  bucket
         if not os.rename(path, path) then
             os.execute('mkdir -p ' .. path)
         end
@@ -383,7 +273,8 @@ local function post_object(internal, bucket, object)
         tmpfile:close()
         realfile:close()
 
-        if object_exists_locally(bucket,object) then
+        local storage_directory = config.current.storage_directory
+        if scs.object_exists_locally(storage_directory, bucket, object_base64) then
             msg = 'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system.'
             exitcode = 200
         else
@@ -405,7 +296,8 @@ local function post_object(internal, bucket, object)
             exitcode = 503
         else
             -- Redirect to one of the corrent hosts here. 307.
-            local url = generate_url(host, object)
+            local port = config.current.bind_port
+            local url = scs.generate_url(host,port,object)
             ngx.header["Location"] = url
             msg = 'Redirecting POST request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
             exitcode = 307
@@ -437,25 +329,21 @@ local function is_internal_request(useragent)
     return false
 end
 
--- Global variable for easy access to the data from within functions
-config = get_configuration()
-
-local h = ngx.req.get_headers()
-local internal = is_internal_request(get_header('user-agent', h))
-local debug = get_header('x-debug', h)
+local internal = is_internal_request(ngx.req.get_headers()['user-agent'])
+local debug = ngx.req.get_headers()['x-debug']
+local status = ngx.req.get_headers()['x-status']
+local bucket = ngx.req.get_headers()['x-bucket']
 
 local exitcode = nil
 local msg = nil
 
 -- Return 200 immediately if the x-status header is set. This is to verify that
 -- the host is up and running.
-local status = get_header('x-status', h)
 if status and internal then
     exitcode = 200
     msg = "Returning 200 to the status check."
 end
 
-local bucket = get_header('x-bucket',h)
 if not status and not bucket then
     exitcode = 400
     msg = "The request is missing the x-bucket header."
@@ -478,6 +366,8 @@ if not status and string.len(object) == 0 then
 end
 
 -- If the preflight checks went OK, go on with the real work here
+config = get_cached_configuration()
+
 if not exitcode then
     local method = ngx.var.request_method
     if method == 'HEAD' then
@@ -493,9 +383,8 @@ if not exitcode then
     end
 end
 
-local after = ngx.now()
-local elapsed = after - before
-ngx.header["x-elapsed"] = elapsed
+local elapsed = ngx.now() - ngx.req.start_time()
+-- ngx.header["x-elapsed"] = elapsed
 
 if debug then
     if msg then
