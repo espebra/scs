@@ -280,6 +280,11 @@ local function post_object(internal, bucket, object)
         local available_hosts = get_available_replica_hosts(hosts)
         for _,host in pairs(available_hosts) do
             local res = scs.sync_object("/srv/files", host, bucket, object_base64)
+            if res then
+                ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " succeeded.")
+            else
+                ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " failed.")
+            end
         end
 
         local storage_directory = config.current.storage_directory
