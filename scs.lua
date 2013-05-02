@@ -96,7 +96,7 @@ local function get_host_with_object(hosts, bucket, object)
     return nil
 end
 
-local function get_available_host(hosts)
+local function get_available_replica_hosts(hosts)
     -- Randomize the hosts table
     -- backwards
     for i = #hosts, 2, -1 do
@@ -109,15 +109,16 @@ local function get_available_host(hosts)
     -- For each host, check if the object is available. Return the first
     -- host that has the object available.
     local port = config.current.bind_port
+    local available_hosts = {}
     for _,host in pairs(hosts) do
         status = scs.remote_host_availability(host, port)
         if status then
-            return host
+            table.insert(available_hosts, host)
         end
     end
 
     -- If any of the hosts are available, return nil
-    return nil
+    return available_hosts
 end
 
 -- Read the configuration
@@ -276,6 +277,11 @@ local function post_object(internal, bucket, object)
         tmpfile:close()
         realfile:close()
 
+        local available_hosts = get_available_replica_hosts(hosts)
+        for _,host in pairs(available_hosts) do
+            local res = scs.sync_object("/srv/files", host, bucket, object_base64)
+        end
+
         local storage_directory = config.current.storage_directory
         if scs.object_exists_locally(storage_directory, bucket, object_base64) then
             msg = 'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system.'
@@ -285,7 +291,11 @@ local function post_object(internal, bucket, object)
             exitcode = 503
         end
     else
-        local host = get_available_host(hosts)
+        local available_hosts = get_available_replica_hosts(hosts)
+        local host = nil
+        if #available_hosts > 0 then
+            host = available_hosts[1]
+        end
 
         -- Easier to understand what is happening when debugging
         local hosts_text = "["
