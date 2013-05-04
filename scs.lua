@@ -82,17 +82,23 @@ local function get_host_with_object(hosts, bucket, object)
         hosts[i], hosts[r] = hosts[r], hosts[i]
     end 
 
+    local port = config.current.bind_port
+
     -- For each host, check if the object is available. Return the first
     -- host that has the object available.
-    for _,host in pairs(hosts) do
-        local port = config.current.bind_port
-        status = scs.object_exists_on_remote_host(true,host,port,bucket,object)
-        if status then
-            return host
-        end
+    local threads = {}
+    for i,host in pairs(hosts) do
+        threads[i] = ngx.thread.spawn(scs.object_exists_on_remote_host, true, host, port, bucket, object)
     end
 
-    -- If the object is not available on any of the hosts, return nil
+    for i = 1, #threads do
+        local ok, res = ngx.thread.wait(threads[i])
+        if not ok then
+            ngx.log(ngx.ERR,"Thread " .. i .. " failed to run: " .. res)
+        else
+            return res
+        end
+    end
     return nil
 end
 
@@ -110,10 +116,17 @@ local function get_available_replica_hosts(hosts)
     -- host that has the object available.
     local port = config.current.bind_port
     local available_hosts = {}
-    for _,host in pairs(hosts) do
-        status = scs.remote_host_availability(host, port)
-        if status then
-            table.insert(available_hosts, host)
+    local threads = {}
+    for i,host in pairs(hosts) do
+        threads[i] = ngx.thread.spawn(scs.remote_host_availability, host, port)
+    end
+
+    for i = 1, #threads do
+        local ok, res = ngx.thread.wait(threads[i])
+        if ok then
+            if res then
+                table.insert(available_hosts, hosts[i])
+            end
         end
     end
 

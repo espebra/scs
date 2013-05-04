@@ -61,7 +61,7 @@ function object_exists_on_remote_host(internal,host,port,bucket,object)
         return nil
     end
     if res.status >= 200 and res.status < 300 then
-        return true
+        return host
     else
         return false
     end
