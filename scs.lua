@@ -1,4 +1,6 @@
 local common = require "scs.common"
+-- local timer = require "scs.timer"
+
 --local http = require "libs.resty.http.simple"
 --local Flexihash = require 'libs.Flexihash'
 local cjson = require 'cjson'
@@ -360,56 +362,10 @@ local function is_internal_request(useragent)
     return false
 end
 
-local function timer()
-    ngx.log(ngx.ERR,"Timer went off")
-    local ok, err = ngx.timer.at(delay, timer)
-end
+-- local delay = 5
+-- timer.initiate_periodic_health_checks(delay)
 
-local function initiate_periodic_health_checks(delay)
-    if ngx.shared.timers then
-        return
-    else
-        ngx.shared.timers = true
-    end
-
-    local config = get_cached_configuration()
-    local handler
-    handler = function (premature)
-        -- do some routine job in Lua just like a cron job
-        if premature then
-            return
-        end
-        local ok, err = ngx.timer.at(delay, handler)
-        if ok then
-            local sites = common.get_all_sites(config)
-
-            for i,site in pairs(sites) do
-                local hosts = config.current.hosts[site]
-                local available_hosts = get_available_replica_hosts(hosts)
-                for i,host in pairs(hosts) do
-                    if available_hosts[host] ~= nil then
-                        ngx.log(ngx.ERR, "Host " .. host .. " is down! " .. #available_hosts .. " of " .. #hosts .. " is up.")
-                    else
-                        ngx.log(ngx.ERR, "Host " .. host .. " is up! " .. #available_hosts .. " of " .. #hosts .. " is up.")
-                    end
-                end
-            end
-        else
-            ngx.log(ngx.ERR, "Failed to create the timer: ", err)
-            return
-        end
-    end
- 
-    local ok, err = ngx.timer.at(delay, handler)
-    if not ok then
-        ngx.log(ngx.ERR, "failed to create the timer: ", err)
-        return
-    end
-end
-
-local delay = 5
-initiate_periodic_health_checks(delay)
-
+ngx.header["server"] = nil
 local internal = is_internal_request(ngx.req.get_headers()['user-agent'])
 local debug = ngx.req.get_headers()['x-debug']
 local status = ngx.req.get_headers()['x-status']
