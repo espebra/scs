@@ -1,4 +1,4 @@
-local scs = require "libs.scslib"
+local common = require "scs.common"
 --local http = require "libs.resty.http.simple"
 --local Flexihash = require 'libs.Flexihash'
 local cjson = require 'cjson'
@@ -27,14 +27,14 @@ local function get_replica_site_hosts(bucket, object, site)
     local hash_map = ngx.shared[site]
     if not hash_map then
         -- If the hash map does not exist, create it and store it for later use
-        hash_map = scs.create_hash_map(config.current.hosts[site])
+        hash_map = common.create_hash_map(config.current.hosts[site])
         ngx.shared[site] = hash_map
     end
     -- Now we have a hash map, either created or read from memory. Use it to
     -- figure out which hosts to use for this object.
     local hash = bucket .. object
     local replicas = config.current.replicas_per_site
-    local result = scs.look_up_hash_map(hash, hash_map, replicas)
+    local result = common.look_up_hash_map(hash, hash_map, replicas)
     return result
 end
 
@@ -58,15 +58,15 @@ local function get_replica_sites(bucket, object)
     local hash_map = ngx.shared.sites
     if not hash_map then
         -- If the hash map does not exist, create it and store it for later use
-        local sites = scs.get_all_sites(config)
-        hash_map = scs.create_hash_map(sites)
+        local sites = common.get_all_sites(config)
+        hash_map = common.create_hash_map(sites)
         ngx.shared.sites = site_hash_map
     end
     -- Now we have a hash map, either created or read from memory. Use it to
     -- figure out which sites to use for this object.
     local hash = bucket .. object
     local replicas = config.current.replica_sites
-    local result = scs.look_up_hash_map(hash, hash_map, replicas)
+    local result = common.look_up_hash_map(hash, hash_map, replicas)
     return result
 end
 
@@ -88,7 +88,7 @@ local function get_host_with_object(hosts, bucket, object)
     -- host that has the object available.
     local threads = {}
     for i,host in pairs(hosts) do
-        threads[i] = ngx.thread.spawn(scs.object_exists_on_remote_host, true, host, port, bucket, object)
+        threads[i] = ngx.thread.spawn(common.object_exists_on_remote_host, true, host, port, bucket, object)
     end
 
     for i = 1, #threads do
@@ -118,7 +118,7 @@ local function get_available_replica_hosts(hosts)
     local available_hosts = {}
     local threads = {}
     for i,host in pairs(hosts) do
-        threads[i] = ngx.thread.spawn(scs.remote_host_availability, host, port)
+        threads[i] = ngx.thread.spawn(common.remote_host_availability, host, port)
     end
 
     for i = 1, #threads do
@@ -139,7 +139,7 @@ local function get_cached_configuration()
     -- Try to read the configuration from the shared memory
     local conf = ngx.shared.conf
     if not conf then
-        conf = scs.get_configuration()
+        conf = common.get_configuration()
         ngx.shared.conf = conf
         ngx.log(ngx.ERR, "Caching configuration")
     end
@@ -163,7 +163,7 @@ local function head_object(internal, bucket, object)
     -- See if the object exists locally
     local object_base64 = ngx.encode_base64(object)
     local dir = config.current.storage_directory
-    if scs.object_exists_locally(dir, bucket, object_base64) then
+    if common.object_exists_locally(dir, bucket, object_base64) then
         exitcode = 200
         msg = "The object " .. object .. " in bucket " .. bucket .. " exists locally."
     end
@@ -188,7 +188,7 @@ local function head_object(internal, bucket, object)
             exitcode = 404
         else
             local port = config.current.bind_port
-            local url = scs.generate_url(host,port,object)
+            local url = common.generate_url(host,port,object)
             msg = 'Redirecting HEAD request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
             ngx.header["Location"] = url
             exitcode = 302
@@ -203,7 +203,7 @@ local function get_object(internal, bucket, object)
     -- See if the object exists locally
     local object_base64 = ngx.encode_base64(object)
     local dir = config.current.storage_directory
-    if scs.object_exists_locally(dir, bucket, object_base64) then
+    if common.object_exists_locally(dir, bucket, object_base64) then
         -- We have the file locally. Serve it directly. 200.
         ngx.header["content-disposition"] = "attachment; filename=" .. object;
         local path = config.current.storage_directory .. "/" ..  bucket
@@ -238,7 +238,7 @@ local function get_object(internal, bucket, object)
                 msg = "The object " .. object .. " in bucket " .. bucket .. " was not found on any of the available replica hosts " .. hosts_text
             else
                 local port = config.current.bind_port
-                local url = scs.generate_url(host,port,object)
+                local url = common.generate_url(host,port,object)
                 -- ngx.say("Host: " .. host)
                 -- ngx.say("Redirect to: " .. url)
                 msg = 'Redirecting GET request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
@@ -292,7 +292,7 @@ local function post_object(internal, bucket, object)
 
         local available_hosts = get_available_replica_hosts(hosts)
         for _,host in pairs(available_hosts) do
-            local res = scs.sync_object("/srv/files", host, bucket, object_base64)
+            local res = common.sync_object("/srv/files", host, bucket, object_base64)
             if res then
                 ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " succeeded.")
             else
@@ -301,7 +301,7 @@ local function post_object(internal, bucket, object)
         end
 
         local storage_directory = config.current.storage_directory
-        if scs.object_exists_locally(storage_directory, bucket, object_base64) then
+        if common.object_exists_locally(storage_directory, bucket, object_base64) then
             msg = 'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system.'
             exitcode = 200
         else
@@ -328,7 +328,7 @@ local function post_object(internal, bucket, object)
         else
             -- Redirect to one of the corrent hosts here. 307.
             local port = config.current.bind_port
-            local url = scs.generate_url(host,port,object)
+            local url = common.generate_url(host,port,object)
             ngx.header["Location"] = url
             msg = 'Redirecting POST request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
             exitcode = 307
@@ -359,6 +359,56 @@ local function is_internal_request(useragent)
     end
     return false
 end
+
+local function timer()
+    ngx.log(ngx.ERR,"Timer went off")
+    local ok, err = ngx.timer.at(delay, timer)
+end
+
+local function initiate_periodic_health_checks(delay)
+    if ngx.shared.timers then
+        return
+    else
+        ngx.shared.timers = true
+    end
+
+    local config = get_cached_configuration()
+    local handler
+    handler = function (premature)
+        -- do some routine job in Lua just like a cron job
+        if premature then
+            return
+        end
+        local ok, err = ngx.timer.at(delay, handler)
+        if ok then
+            local sites = common.get_all_sites(config)
+
+            for i,site in pairs(sites) do
+                local hosts = config.current.hosts[site]
+                local available_hosts = get_available_replica_hosts(hosts)
+                for i,host in pairs(hosts) do
+                    if available_hosts[host] ~= nil then
+                        ngx.log(ngx.ERR, "Host " .. host .. " is down! " .. #available_hosts .. " of " .. #hosts .. " is up.")
+                    else
+                        ngx.log(ngx.ERR, "Host " .. host .. " is up! " .. #available_hosts .. " of " .. #hosts .. " is up.")
+                    end
+                end
+            end
+        else
+            ngx.log(ngx.ERR, "Failed to create the timer: ", err)
+            return
+        end
+    end
+ 
+    local ok, err = ngx.timer.at(delay, handler)
+    if not ok then
+        ngx.log(ngx.ERR, "failed to create the timer: ", err)
+        return
+    end
+end
+
+local delay = 5
+initiate_periodic_health_checks(delay)
 
 local internal = is_internal_request(ngx.req.get_headers()['user-agent'])
 local debug = ngx.req.get_headers()['x-debug']

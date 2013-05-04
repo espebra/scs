@@ -1,5 +1,5 @@
 module(..., package.seeall)
-local Flexihash = require 'libs.Flexihash'
+local Flexihash = require 'Flexihash'
 
 local function read_configuration_file(path, required)
     -- Read the current configuration
