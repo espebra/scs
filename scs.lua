@@ -5,159 +5,6 @@ local common = require "scs.common"
 --local Flexihash = require 'libs.Flexihash'
 local cjson = require 'cjson'
 
--- Verify that the bucket name is valid
-local function verify_bucket(bucket)
-    if not bucket then 
-        return false 
-    end
-    if #bucket < 3 then 
-        return false 
-    end
-    if #bucket > 40 then 
-        return false 
-    end
-    if not ngx.re.match(bucket, '^[a-zA-Z0-9]+$','j') then
-        return false 
-    end
-    return true
-end
-
--- Return a table with the hosts at a specific site  where a given object fits 
--- according to the hash ring.
-local function get_replica_site_hosts(bucket, object, site) 
-    -- Try to read the hash map from shared memory
-    local hash_map = ngx.shared[site]
-    if not hash_map then
-        -- If the hash map does not exist, create it and store it for later use
-        hash_map = common.create_hash_map(config.current.hosts[site])
-        ngx.shared[site] = hash_map
-    end
-    -- Now we have a hash map, either created or read from memory. Use it to
-    -- figure out which hosts to use for this object.
-    local hash = bucket .. object
-    local replicas = config.current.replicas_per_site
-    local result = common.look_up_hash_map(hash, hash_map, replicas)
-    return result
-end
-
--- Return a table with the hosts and sites where a given object fits
--- according to the hash ring.
-local function get_replica_hosts(bucket, object, sites)
-    local hosts = {}
-    for _,site in pairs(sites) do
-        local result = get_replica_site_hosts(bucket, object, site)
-        for _, host in pairs(result) do
-            table.insert(hosts, host)
-        end
-    end
-    return hosts
-end
-
--- Return a table with the sites where a given object fits according to the
--- hash ring.
-local function get_replica_sites(bucket, object)
-    -- Try to read the hash map from shared memory
-    local hash_map = ngx.shared.sites
-    if not hash_map then
-        -- If the hash map does not exist, create it and store it for later use
-        local sites = common.get_all_sites(config)
-        hash_map = common.create_hash_map(sites)
-        ngx.shared.sites = site_hash_map
-    end
-    -- Now we have a hash map, either created or read from memory. Use it to
-    -- figure out which sites to use for this object.
-    local hash = bucket .. object
-    local replicas = config.current.replica_sites
-    local result = common.look_up_hash_map(hash, hash_map, replicas)
-    return result
-end
-
--- Figure out exactly which host to use from the hosts given from the hash
--- ring lookup,
-local function get_host_with_object(hosts, bucket, object)
-    -- Randomize the hosts table
-    -- backwards
-    for i = #hosts, 2, -1 do
-        -- select a random number between 1 and i
-        local r = math.random(i)
-         -- swap the randomly selected item to position i
-        hosts[i], hosts[r] = hosts[r], hosts[i]
-    end 
-
-    local port = config.current.bind_port
-
-    -- For each host, check if the object is available. Return the first
-    -- host that has the object available.
-    local threads = {}
-    for i,host in pairs(hosts) do
-        threads[i] = ngx.thread.spawn(common.object_exists_on_remote_host, true, host, port, bucket, object)
-    end
-
-    for i = 1, #threads do
-        local ok, res = ngx.thread.wait(threads[i])
-        if not ok then
-            ngx.log(ngx.ERR,"Thread " .. i .. " failed to run: " .. res)
-        else
-            return res
-        end
-    end
-    return nil
-end
-
-local function get_available_replica_hosts(hosts)
-    -- Randomize the hosts table
-    -- backwards
-    for i = #hosts, 2, -1 do
-        -- select a random number between 1 and i
-        local r = math.random(i)
-         -- swap the randomly selected item to position i
-        hosts[i], hosts[r] = hosts[r], hosts[i]
-    end 
-
-    -- For each host, check if the object is available. Return the first
-    -- host that has the object available.
-    local port = config.current.bind_port
-    local available_hosts = {}
-    local threads = {}
-    for i,host in pairs(hosts) do
-        threads[i] = ngx.thread.spawn(common.remote_host_availability, host, port)
-    end
-
-    for i = 1, #threads do
-        local ok, res = ngx.thread.wait(threads[i])
-        if ok then
-            if res then
-                table.insert(available_hosts, hosts[i])
-            end
-        end
-    end
-
-    -- If any of the hosts are available, return nil
-    return available_hosts
-end
-
--- Read the configuration
-local function get_cached_configuration()
-    -- Try to read the configuration from the shared memory
-    local conf = ngx.shared.conf
-    if not conf then
-        conf = common.get_configuration()
-        ngx.shared.conf = conf
-        ngx.log(ngx.ERR, "Caching configuration")
-    end
-
-    return conf
-end
-
-local function object_fits_on_this_host(hosts)
-    for _,host in pairs(hosts) do
-        if ngx.req.get_headers()["Host"] == host then
-            return true
-        end
-    end
-    return false
-end
-
 local function head_object(internal, bucket, object)
     local exitcode = 404
     local msg = nil
@@ -173,9 +20,9 @@ local function head_object(internal, bucket, object)
     -- The object do not exist locally
     if not internal then
         -- Redirect to another host if this is not an internal request
-        local sites = get_replica_sites(bucket, object)
-        local hosts = get_replica_hosts(bucket, object, sites)
-        local host = get_host_with_object(hosts, bucket, object)
+        local sites = common.get_replica_sites(bucket, object)
+        local hosts = common.get_replica_hosts(bucket, object, sites)
+        local host = common.get_host_with_object(hosts, bucket, object)
 
         -- Easier to understand what is happening when debugging
         local hosts_text = "["
@@ -225,9 +72,9 @@ local function get_object(internal, bucket, object)
         if not internal then
             -- We do not have the file locally. Should lookup the hash table to
             -- find a valid host to redirect to. 302.
-            local sites = get_replica_sites(bucket, object)
-            local hosts = get_replica_hosts(bucket, object, sites)
-            local host = get_host_with_object(hosts, bucket, object)
+            local sites = common.get_replica_sites(bucket, object)
+            local hosts = common.get_replica_hosts(bucket, object, sites)
+            local host = common.get_host_with_object(hosts, bucket, object)
 
             -- Easier to understand what is happening when debugging
             local hosts_text = "["
@@ -253,12 +100,12 @@ local function get_object(internal, bucket, object)
 end
 
 local function post_object(internal, bucket, object)
-    local sites = get_replica_sites(bucket, object)
-    local hosts = get_replica_hosts(bucket, object, sites)
+    local sites = common.get_replica_sites(bucket, object)
+    local hosts = common.get_replica_hosts(bucket, object, sites)
     local exitcode = 404
     local msg = nil
 
-    if object_fits_on_this_host(hosts) then
+    if common.object_fits_on_this_host(hosts) then
         local object_base64 = ngx.encode_base64(object)
         local path = config.current.storage_directory .. "/" ..  bucket
         if not os.rename(path, path) then
@@ -292,7 +139,7 @@ local function post_object(internal, bucket, object)
         tmpfile:close()
         realfile:close()
 
-        local available_hosts = get_available_replica_hosts(hosts)
+        local available_hosts = common.get_available_replica_hosts(hosts)
         for _,host in pairs(available_hosts) do
             local res = common.sync_object("/srv/files", host, bucket, object_base64)
             if res then
@@ -311,7 +158,7 @@ local function post_object(internal, bucket, object)
             exitcode = 503
         end
     else
-        local available_hosts = get_available_replica_hosts(hosts)
+        local available_hosts = common.get_available_replica_hosts(hosts)
         local host = nil
         if #available_hosts > 0 then
             host = available_hosts[1]
@@ -353,20 +200,11 @@ local function delete_object(internal, bucket, object)
     return exitcode, msg
 end
 
-local function is_internal_request(useragent)
-    if useragent then
-        if useragent == "scs internal" then
-            return true
-        end
-    end
-    return false
-end
-
 -- local delay = 5
 -- timer.initiate_periodic_health_checks(delay)
 
 ngx.header["server"] = nil
-local internal = is_internal_request(ngx.req.get_headers()['user-agent'])
+local internal = common.is_internal_request(ngx.req.get_headers()['user-agent'])
 local debug = ngx.req.get_headers()['x-debug']
 local status = ngx.req.get_headers()['x-status']
 local bucket = ngx.req.get_headers()['x-bucket']
@@ -386,7 +224,7 @@ if not status and not bucket then
     msg = "The request is missing the x-bucket header."
 end
 
-if not status and not verify_bucket(bucket) then
+if not status and not common.verify_bucket(bucket) then
     exitcode = 400
     if bucket == nil then
         msg = "Invalid bucket name."
@@ -406,7 +244,7 @@ end
 object = ngx.unescape_uri(object)
 
 -- If the preflight checks went OK, go on with the real work here
-config = get_cached_configuration()
+config = common.get_cached_configuration()
 
 if not exitcode then
     local method = ngx.var.request_method

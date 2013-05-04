@@ -22,6 +22,23 @@ local function read_json_file(path, required)
     return conf
 end
 
+-- Verify that the bucket name is valid
+function M.verify_bucket(bucket)
+    if not bucket then
+        return false
+    end
+    if #bucket < 3 then
+        return false
+    end
+    if #bucket > 40 then
+        return false
+    end
+    if not ngx.re.match(bucket, '^[a-zA-Z0-9]+$','j') then
+        return false
+    end
+    return true
+end
+
 -- Check if an object exists in the local file system
 function M.object_exists_locally(dir, bucket, object_base64)
    local path = dir .. "/" ..  bucket .. "/" .. object_base64
@@ -145,6 +162,151 @@ function M.sync_object(dir, host, bucket, object_base64)
     else
         return false
     end
+end
+
+-- Return a table with the hosts at a specific site  where a given object fits
+-- according to the hash ring.
+function M.get_replica_site_hosts(bucket, object, site)
+    -- Try to read the hash map from shared memory
+    local hash_map = ngx.shared[site]
+    if not hash_map then
+        -- If the hash map does not exist, create it and store it for later use
+        hash_map = M.create_hash_map(config.current.hosts[site])
+        ngx.shared[site] = hash_map
+    end
+    -- Now we have a hash map, either created or read from memory. Use it to
+    -- figure out which hosts to use for this object.
+    local hash = bucket .. object
+    local replicas = config.current.replicas_per_site
+    local result = M.look_up_hash_map(hash, hash_map, replicas)
+    return result
+end
+
+-- Return a table with the hosts and sites where a given object fits
+-- according to the hash ring.
+function M.get_replica_hosts(bucket, object, sites)
+    local hosts = {}
+    for _,site in pairs(sites) do
+        local result = M.get_replica_site_hosts(bucket, object, site)
+        for _, host in pairs(result) do
+            table.insert(hosts, host)
+        end
+    end
+    return hosts
+end
+
+-- Return a table with the sites where a given object fits according to the
+-- hash ring.
+function M.get_replica_sites(bucket, object)
+    -- Try to read the hash map from shared memory
+    local hash_map = ngx.shared.sites
+    if not hash_map then
+        -- If the hash map does not exist, create it and store it for later use
+        local sites = M.get_all_sites(config)
+        hash_map = M.create_hash_map(sites)
+        ngx.shared.sites = site_hash_map
+    end
+    -- Now we have a hash map, either created or read from memory. Use it to
+    -- figure out which sites to use for this object.
+    local hash = bucket .. object
+    local replicas = config.current.replica_sites
+    local result = M.look_up_hash_map(hash, hash_map, replicas)
+    return result
+end
+
+-- Figure out exactly which host to use from the hosts given from the hash
+-- ring lookup,
+function M.get_host_with_object(hosts, bucket, object)
+    -- Randomize the hosts table
+    -- backwards
+    for i = #hosts, 2, -1 do
+        -- select a random number between 1 and i
+        local r = math.random(i)
+         -- swap the randomly selected item to position i
+        hosts[i], hosts[r] = hosts[r], hosts[i]
+    end
+
+    local port = config.current.bind_port
+
+    -- For each host, check if the object is available. Return the first
+    -- host that has the object available.
+    local threads = {}
+    for i,host in pairs(hosts) do
+        threads[i] = ngx.thread.spawn(object_exists_on_remote_host, true, host, port, bucket, object)
+    end
+
+    for i = 1, #threads do
+        local ok, res = ngx.thread.wait(threads[i])
+        if not ok then
+            ngx.log(ngx.ERR,"Thread " .. i .. " failed to run: " .. res)
+        else
+            return res
+        end
+    end
+    return nil
+end
+
+function M.get_available_replica_hosts(hosts)
+    -- Randomize the hosts table
+    -- backwards
+    for i = #hosts, 2, -1 do
+        -- select a random number between 1 and i
+        local r = math.random(i)
+         -- swap the randomly selected item to position i
+        hosts[i], hosts[r] = hosts[r], hosts[i]
+    end
+
+    -- For each host, check if the object is available. Return the first
+    -- host that has the object available.
+    local port = config.current.bind_port
+    local available_hosts = {}
+    local threads = {}
+    for i,host in pairs(hosts) do
+        threads[i] = ngx.thread.spawn(M.remote_host_availability, host, port)
+    end
+
+    for i = 1, #threads do
+        local ok, res = ngx.thread.wait(threads[i])
+        if ok then
+            if res then
+                table.insert(available_hosts, hosts[i])
+            end
+        end
+    end
+
+    -- If any of the hosts are available, return nil
+    return available_hosts
+end
+
+-- Read the configuration
+function M.get_cached_configuration()
+    -- Try to read the configuration from the shared memory
+    local conf = ngx.shared.conf
+    if not conf then
+        conf = M.get_configuration()
+        ngx.shared.conf = conf
+        ngx.log(ngx.ERR, "Caching configuration")
+    end
+
+    return conf
+end
+
+function M.object_fits_on_this_host(hosts)
+    for _,host in pairs(hosts) do
+        if ngx.req.get_headers()["Host"] == host then
+            return true
+        end
+    end
+    return false
+end
+
+function M.is_internal_request(useragent)
+    if useragent then
+        if useragent == "scs internal" then
+            return true
+        end
+    end
+    return false
 end
 
 return M
