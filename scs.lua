@@ -383,6 +383,9 @@ if not status and string.len(object) == 0 then
     msg = "The object name is not set."
 end
 
+-- Unescape the filename of the object before hashing
+object = ngx.unescape_uri(object)
+
 -- If the preflight checks went OK, go on with the real work here
 config = get_cached_configuration()
 
