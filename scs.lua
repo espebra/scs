@@ -204,10 +204,11 @@ end
 -- timer.initiate_periodic_health_checks(delay)
 
 ngx.header["server"] = nil
-local internal = common.is_internal_request(ngx.req.get_headers()['user-agent'])
-local debug = ngx.req.get_headers()['x-debug']
-local status = ngx.req.get_headers()['x-status']
-local bucket = ngx.req.get_headers()['x-bucket']
+local h = ngx.req.get_headers()
+local internal = common.is_internal_request(h['user-agent'])
+local debug = h['x-debug']
+local status = h['x-status']
+local bucket = h['x-bucket']
 
 local exitcode = nil
 local msg = nil
@@ -243,11 +244,22 @@ end
 -- Unescape the filename of the object before hashing
 object = ngx.unescape_uri(object)
 
+-- Assemble the request metadata table
+local r = {
+  ['object'] = object, -- Plain text name of the object
+  ['object_base64'] = ngx.encode_base64(object), -- Base64 name of the object
+  ['method'] = ngx.var.request_method, -- Request method (HEAD, GET, POST, ..)
+  ['bucket'] = bucket, -- Name of the bucket
+  ['internal'] = internal, -- True if internal signaling request
+  ['debug'] = debug, -- Add debug information in the response
+}
+
 -- If the preflight checks went OK, go on with the real work here
 config = common.get_cached_configuration()
 
 if not exitcode then
-    local method = ngx.var.request_method
+    --exitcode, msg = route.request(r)
+    local method = r['method']
     if method == 'HEAD' then
         exitcode, msg = head_object(internal, bucket, object)
     elseif method == "GET" then
@@ -262,7 +274,9 @@ if not exitcode then
 end
 
 local elapsed = ngx.now() - ngx.req.start_time()
--- ngx.header["x-elapsed"] = elapsed
+if not ngx.headers_sent then
+    ngx.header["x-elapsed"] = elapsed
+end
 
 if debug then
     if msg then

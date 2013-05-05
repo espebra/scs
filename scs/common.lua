@@ -232,7 +232,7 @@ function M.get_host_with_object(hosts, bucket, object)
     -- host that has the object available.
     local threads = {}
     for i,host in pairs(hosts) do
-        threads[i] = ngx.thread.spawn(object_exists_on_remote_host, true, host, port, bucket, object)
+        threads[i] = ngx.thread.spawn(M.object_exists_on_remote_host, true, host, port, bucket, object)
     end
 
     for i = 1, #threads do
