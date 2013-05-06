@@ -112,7 +112,7 @@ end
 local function post_object(internal, bucket, object)
     local sites = common.get_object_replica_sites(bucket, object)
     local hosts = common.get_replica_hosts(bucket, object, sites)
-    local exitcode = 404
+    local exitcode = ngx.HTTP_NOT_FOUND
     local msg = nil
 
     local dir = common.get_storage_directory()
@@ -128,12 +128,12 @@ local function post_object(internal, bucket, object)
 
         if not req_body_file then
             msg = 'No file found in request'
-            exitcode = 400
+            exitcode = ngx.HTTP_BAD_REQUEST
         end
 
         if req_body_file == nil then
             msg = 'Request body is nil'
-            exitcode = 400
+            exitcode = ngx.HTTP_BAD_REQUEST
         end
 
         tmpfile = io.open(req_body_file)
@@ -149,6 +149,12 @@ local function post_object(internal, bucket, object)
         end
         tmpfile:close()
         realfile:close()
+
+        -- Finish the request here if the configuration is set to writeback.
+        local writeback = common.get_writeback()
+        if writeback then
+            ngx.eof()
+        end
 
         local available_hosts = common.get_available_replica_hosts(hosts)
         for _,host in pairs(available_hosts) do

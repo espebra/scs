@@ -155,6 +155,11 @@ function M.generate_url(host, port, object)
     return url
 end
 
+function M.get_writeback()
+    local conf = M.get_configuration()
+    return conf.current.writeback
+end
+
 function M.get_replicas_per_site()
     local conf = M.get_configuration()
     return conf.current.replicas_per_site
@@ -362,7 +367,9 @@ function M.get_available_replica_hosts(hosts)
     local available_hosts = {}
     local threads = {}
     for i,host in pairs(hosts) do
-        threads[i] = ngx.thread.spawn(M.remote_host_availability, host, port)
+        if M.get_host_status(host) then
+            table.insert(threads,ngx.thread.spawn(M.remote_host_availability, host, port))
+        end
     end
 
     for i = 1, #threads do
