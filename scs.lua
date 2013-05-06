@@ -61,7 +61,7 @@ local function get_object(internal, bucket, object)
         ngx.header["content-disposition"] = "attachment; filename=" .. object;
         local path = dir .. "/" ..  bucket
         local fp = io.open(path .. "/" .. object_base64, 'r')
-        local size = 2^13      -- good buffer size (8K)
+        local size = 2^20      -- good buffer size (1M)
         -- Stream the contents of the file to the client
         while true do
             local block = fp:read(size)
@@ -139,7 +139,7 @@ local function post_object(internal, bucket, object)
         tmpfile = io.open(req_body_file)
         realfile = io.open(path .. "/" .. object_base64, 'w')
 
-        local size = 2^13      -- good buffer size (8K)
+        local size = 2^20      -- good buffer size (1M)
         while true do
             local block = tmpfile:read(size)
             if not block then 
