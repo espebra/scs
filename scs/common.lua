@@ -102,7 +102,7 @@ function M.object_exists_on_remote_host(internal,host,port,bucket,object)
         method  = "HEAD",
         version = 0,
         path    = "/" .. object,
-        timeout = 500,
+        timeout = 1000,
         headers = headers
     })
     if not res then
@@ -125,7 +125,7 @@ function M.remote_host_availability(host, port)
         method  = "HEAD",
         version = 0,
         path    = "/",
-        timeout = 500,
+        timeout = 1000,
         headers = headers
     })
     if not res then
