@@ -150,15 +150,24 @@ local function post_object(internal, bucket, object)
         tmpfile:close()
         realfile:close()
 
+        if common.object_exists_locally(dir, bucket, object_base64) then
+            msg = 'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system.'
+            exitcode = ngx.HTTP_OK
+        else
+            msg = 'Failed to write object ' .. object .. ' in bucket ' .. bucket .. ' to local file system'
+            exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
+        end
+
         -- Finish the request here if the configuration is set to write back.
         local write_back = common.get_write_back()
         if write_back then
             ngx.eof()
         end
 
+        -- Replicate the object to other hosts here.
         for _,host in pairs(hosts) do
             if common.get_host_status(host) then
-                local res = common.sync_object("/srv/files", host, bucket, object_base64)
+                local res = common.sync_object(dir, host, bucket, object_base64)
                 if res then
                     ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " succeeded.")
                 else
@@ -167,14 +176,6 @@ local function post_object(internal, bucket, object)
             else
                 ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " not initiated. The host is down.")
             end
-        end
-
-        if common.object_exists_locally(dir, bucket, object_base64) then
-            msg = 'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system.'
-            exitcode = ngx.HTTP_OK
-        else
-            msg = 'Failed to write object ' .. object .. ' in bucket ' .. bucket .. ' to local file system'
-            exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
         end
     else
         local host = nil
