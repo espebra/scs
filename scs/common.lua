@@ -131,6 +131,26 @@ function M.generate_url(host, port, object)
     return url
 end
 
+function M.get_replicas_per_site()
+    local conf = M.get_configuration()
+    return conf.current.replicas_per_site
+end
+
+function M.get_replica_sites()
+    local conf = M.get_configuration()
+    return conf.current.replica_sites
+end
+
+function M.get_bind_port()
+    local conf = M.get_configuration()
+    return conf.current.bind_port
+end
+
+function M.get_storage_directory()
+    local conf = M.get_configuration()
+    return conf.current.storage_directory
+end
+
 function M.get_configuration()
     local conf = ngx.shared.conf
     if not conf then
@@ -215,7 +235,7 @@ function M.get_replica_site_hosts(bucket, object, site)
     -- Now we have a hash map, either created or read from memory. Use it to
     -- figure out which hosts to use for this object.
     local hash = bucket .. object
-    local replicas = config.current.replicas_per_site
+    local replicas = M.get_replicas_per_site()
     local result = M.look_up_hash_map(hash, hash_map, replicas)
     return result
 end
@@ -235,7 +255,7 @@ end
 
 -- Return a table with the sites where a given object fits according to the
 -- hash ring.
-function M.get_replica_sites(bucket, object)
+function M.get_object_replica_sites(bucket, object)
     -- Try to read the hash map from shared memory
     local hash_map = ngx.shared.sites_hash_map
     if not hash_map then
@@ -247,7 +267,7 @@ function M.get_replica_sites(bucket, object)
     -- Now we have a hash map, either created or read from memory. Use it to
     -- figure out which sites to use for this object.
     local hash = bucket .. object
-    local replicas = config.current.replica_sites
+    local replicas = M.get_replica_sites()
     local result = M.look_up_hash_map(hash, hash_map, replicas)
     return result
 end
@@ -270,7 +290,7 @@ function M.get_host_with_object(hosts, bucket, object)
     -- backwards
     hosts = M.randomize_table(hosts)
 
-    local port = config.current.bind_port
+    local port = M.get_bind_port()
 
     -- For each host, check if the object is available. Return the first
     -- host that has the object available.
@@ -302,7 +322,7 @@ function M.get_available_replica_hosts(hosts)
 
     -- For each host, check if the object is available. Return the first
     -- host that has the object available.
-    local port = config.current.bind_port
+    local port = M.get_bind_port()
     local available_hosts = {}
     local threads = {}
     for i,host in pairs(hosts) do

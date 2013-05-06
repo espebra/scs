@@ -11,7 +11,7 @@ local function head_object(internal, bucket, object)
 
     -- See if the object exists locally
     local object_base64 = ngx.encode_base64(object)
-    local dir = config.current.storage_directory
+    local dir = common.get_storage_directory()
     if common.object_exists_locally(dir, bucket, object_base64) then
         exitcode = 200
         msg = "The object " .. object .. " in bucket " .. bucket .. " exists locally."
@@ -20,7 +20,7 @@ local function head_object(internal, bucket, object)
     -- The object do not exist locally
     if not internal then
         -- Redirect to another host if this is not an internal request
-        local sites = common.get_replica_sites(bucket, object)
+        local sites = common.get_object_replica_sites(bucket, object)
         local hosts = common.get_replica_hosts(bucket, object, sites)
         local host = common.get_host_with_object(hosts, bucket, object)
 
@@ -36,7 +36,7 @@ local function head_object(internal, bucket, object)
             msg = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts " .. hosts_text
             exitcode = 404
         else
-            local port = config.current.bind_port
+            local port = common.get_bind_port()
             local url = common.generate_url(host,port,object)
             msg = 'Redirecting HEAD request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
             ngx.header["Location"] = url
@@ -51,11 +51,11 @@ local function get_object(internal, bucket, object)
     local msg = nil
     -- See if the object exists locally
     local object_base64 = ngx.encode_base64(object)
-    local dir = config.current.storage_directory
+    local dir = common.get_storage_directory()
     if common.object_exists_locally(dir, bucket, object_base64) then
         -- We have the file locally. Serve it directly. 200.
         ngx.header["content-disposition"] = "attachment; filename=" .. object;
-        local path = config.current.storage_directory .. "/" ..  bucket
+        local path = dir .. "/" ..  bucket
         local fp = io.open(path .. "/" .. object_base64, 'r')
         local size = 2^13      -- good buffer size (8K)
         -- Stream the contents of the file to the client
@@ -72,7 +72,7 @@ local function get_object(internal, bucket, object)
         if not internal then
             -- We do not have the file locally. Should lookup the hash table to
             -- find a valid host to redirect to. 302.
-            local sites = common.get_replica_sites(bucket, object)
+            local sites = common.get_object_replica_sites(bucket, object)
             local hosts = common.get_replica_hosts(bucket, object, sites)
             local host = common.get_host_with_object(hosts, bucket, object)
 
@@ -86,7 +86,7 @@ local function get_object(internal, bucket, object)
             if host == nil then
                 msg = "The object " .. object .. " in bucket " .. bucket .. " was not found on any of the available replica hosts " .. hosts_text
             else
-                local port = config.current.bind_port
+                local port = common.get_bind_port()
                 local url = common.generate_url(host,port,object)
                 -- ngx.say("Host: " .. host)
                 -- ngx.say("Redirect to: " .. url)
@@ -100,14 +100,15 @@ local function get_object(internal, bucket, object)
 end
 
 local function post_object(internal, bucket, object)
-    local sites = common.get_replica_sites(bucket, object)
+    local sites = common.get_object_replica_sites(bucket, object)
     local hosts = common.get_replica_hosts(bucket, object, sites)
     local exitcode = 404
     local msg = nil
 
+    local dir = common.get_storage_directory()
     if common.object_fits_on_this_host(hosts) then
         local object_base64 = ngx.encode_base64(object)
-        local path = config.current.storage_directory .. "/" ..  bucket
+        local path = dir .. "/" ..  bucket
         if not os.rename(path, path) then
             os.execute('mkdir -p ' .. path)
         end
@@ -149,8 +150,7 @@ local function post_object(internal, bucket, object)
             end
         end
 
-        local storage_directory = config.current.storage_directory
-        if common.object_exists_locally(storage_directory, bucket, object_base64) then
+        if common.object_exists_locally(dir, bucket, object_base64) then
             msg = 'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system.'
             exitcode = 200
         else
@@ -176,7 +176,7 @@ local function post_object(internal, bucket, object)
             exitcode = 503
         else
             -- Redirect to one of the corrent hosts here. 307.
-            local port = config.current.bind_port
+            local port = common.get_bind_port()
             local url = common.generate_url(host,port,object)
             ngx.header["Location"] = url
             msg = 'Redirecting POST request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
@@ -252,9 +252,6 @@ local r = {
   ['internal'] = internal, -- True if internal signaling request
   ['debug'] = debug, -- Add debug information in the response
 }
-
--- If the preflight checks went OK, go on with the real work here
-config = common.get_configuration()
 
 --exitcode, msg = route.request(r)
 if not exitcode then
