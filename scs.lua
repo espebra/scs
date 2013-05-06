@@ -51,7 +51,7 @@ local function head_object(internal, bucket, object)
 end
 
 local function get_object(internal, bucket, object)
-    local exitcode = 404
+    local exitcode = ngx.HTTP_NOT_FOUND
     local msg = nil
     -- See if the object exists locally
     local object_base64 = ngx.encode_base64(object)
@@ -70,7 +70,7 @@ local function get_object(internal, bucket, object)
         end
         fp:close()
         local msg = "Object " .. object .. " in bucket " .. bucket .. " delivered successfully to the client."
-        exitcode = 200
+        exitcode = ngx.HTTP_OK
     else
         -- The object do not exist locally
         if not internal then
@@ -171,10 +171,10 @@ local function post_object(internal, bucket, object)
 
         if common.object_exists_locally(dir, bucket, object_base64) then
             msg = 'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system.'
-            exitcode = 200
+            exitcode = ngx.HTTP_OK
         else
             msg = 'Failed to write object ' .. object .. ' in bucket ' .. bucket .. ' to local file system'
-            exitcode = 503
+            exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
         end
     else
         local host = nil
@@ -189,7 +189,7 @@ local function post_object(internal, bucket, object)
 
         if host == nil then
             msg = 'None of the hosts for object ' .. object .. ' in bucket ' .. bucket .. ' are available at the moment ' .. hosts_text
-            exitcode = 503
+            exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
         else
             -- Redirect to one of the corrent hosts here. 307.
             ngx.log(ngx.ERR,"Found " .. #hosts .. " available hosts, selected " .. host)
@@ -205,7 +205,7 @@ end
 
 local function put_object(internal, bucket, object, req_body_file)
     local msg
-    local exitcode=200
+    local exitcode = ngx.HTTP_OK
     ngx.req.read_body()
     local req_body_file = ngx.req.get_body_file()
     return exitcode, msg
@@ -213,7 +213,7 @@ end
 
 local function delete_object(internal, bucket, object)
     local msg
-    local exitcode=200
+    local exitcode = ngx.HTTP_OK
     return exitcode, msg
 end
 
@@ -232,17 +232,17 @@ local msg = nil
 -- Return 200 immediately if the x-status header is set. This is to verify that
 -- the host is up and running.
 if status and internal then
-    exitcode = 200
+    exitcode = ngx.HTTP_OK
     msg = "Returning 200 to the status check."
 end
 
 if not status and not bucket then
-    exitcode = 400
+    exitcode = ngx.HTTP_BAD_REQUEST
     msg = "The request is missing the x-bucket header."
 end
 
 if not status and not common.verify_bucket(bucket) then
-    exitcode = 400
+    exitcode = ngx.HTTP_BAD_REQUEST
     if bucket == nil then
         msg = "Invalid bucket name."
     else
@@ -253,7 +253,7 @@ end
 -- Read the object name, and remove the first char (which is a /)
 local object = string.sub(ngx.var.request_uri, 2)
 if not status and string.len(object) == 0 then
-    exitcode = 400
+    exitcode = ngx.HTTP_BAD_REQUEST
     msg = "The object name is not set."
 end
 
