@@ -25,6 +25,11 @@ end
 function M.get_host_status(host)
     local s = ngx.shared.status
     local value, flags = s:get(host)
+    if value then
+        ngx.log(ngx.ERR,"Host " .. host .. " is up")
+    else
+        ngx.log(ngx.ERR,"Host " .. host .. " is down")
+    end
     return value
 end
 
@@ -137,10 +142,9 @@ end
 -- Create a consistent hash of the values given in a table
 function M.create_hash_map(values)
     local hash_map = Flexihash.New()
-    local i = ""
     for _,value in pairs(values) do
+        -- ngx.log(ngx.ERR,"Adding value " .. value .. " of type " .. type(value) .. " to the hash")
         hash_map:addTarget(value)
-        i = i .. " " .. value
     end
     return hash_map
 end
@@ -196,18 +200,15 @@ end
 
 -- Return a table containing the hosts in a given site
 function M.get_site_hosts(site)
-    local hosts = ngx.shared.sites[site]
-    if not hosts then
-        hosts = {}
-        local conf = M.get_configuration()
-        for host,h in pairs(conf.current.hosts) do
-            if h['site'] == site then
-                table.insert(hosts,host)
-                ngx.log(ngx.ERR,"Caching: Host " .. host .. " is in site " ..  h['site'])
-            end
+    local hosts = {}
+    local conf = M.get_configuration()
+    for host,h in pairs(conf.current.hosts) do
+        if h['site'] == site then
+            table.insert(hosts,host)
+            -- ngx.log(ngx.ERR,"Caching: Host " .. host .. " is in site " ..  h['site'])
         end
-        ngx.shared.sites[site] = hosts
     end
+    
     -- ngx.log(ngx.ERR,"Returned " .. #hosts .. " hosts in site " .. site)
     return hosts
 end
@@ -258,12 +259,13 @@ end
 -- according to the hash ring.
 function M.get_replica_site_hosts(bucket, object, site)
     -- Try to read the hash map from shared memory
-    local hash_map = ngx.shared[site]
+    --local hash_map = ngx.shared[site]
+    local hash_map = false
     if not hash_map then
         -- If the hash map does not exist, create it and store it for later use
         local hosts = M.get_site_hosts(site)
         hash_map = M.create_hash_map(hosts)
-        ngx.shared[site] = hash_map
+        --ngx.shared[site] = hash_map
     end
     -- Now we have a hash map, either created or read from memory. Use it to
     -- figure out which hosts to use for this object.
@@ -290,12 +292,13 @@ end
 -- hash ring.
 function M.get_object_replica_sites(bucket, object)
     -- Try to read the hash map from shared memory
-    local hash_map = ngx.shared.sites_hash_map
+    -- local hash_map = ngx.shared.sites_hash_map
+    local hash_map = false
     if not hash_map then
         -- If the hash map does not exist, create it and store it for later use
         local sites = M.get_all_sites()
         hash_map = M.create_hash_map(sites)
-        ngx.shared.sites_hash_map = hash_map
+        -- ngx.shared.sites_hash_map = hash_map
     end
     -- Now we have a hash map, either created or read from memory. Use it to
     -- figure out which sites to use for this object.
@@ -345,7 +348,9 @@ function M.get_host_with_object(hosts, bucket, object)
         if not ok then
             ngx.log(ngx.ERR,"Thread " .. i .. " failed to run: " .. res)
         else
-            return res
+            if res then
+                return res
+            end
         end
     end
     return status

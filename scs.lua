@@ -6,7 +6,7 @@ local timer = require "scs.timer"
 local cjson = require 'cjson'
 
 local function head_object(internal, bucket, object)
-    local exitcode = ngx.HTTP_INTERNAL_SERVER_ERROR
+    local exitcode = ngx.HTTP_NOT_FOUND
     local msg = nil
 
     -- See if the object exists locally
@@ -22,7 +22,6 @@ local function head_object(internal, bucket, object)
         -- Redirect to another host if this is not an internal request
         local sites = common.get_object_replica_sites(bucket, object)
         local hosts = common.get_replica_hosts(bucket, object, sites)
-        local host = common.get_host_with_object(hosts, bucket, object)
 
         -- Easier to understand what is happening when debugging
         local hosts_text = "["
@@ -31,8 +30,9 @@ local function head_object(internal, bucket, object)
         end
         hosts_text = hosts_text .. " ]"
     
+        local host = common.get_host_with_object(hosts, bucket, object)
         if host == nil then
-            msg = "All the replica hosts for object " .. object .. " in bucket " .. bucket .. " are unavailable. Please try again later."
+            msg = "All the replica hosts for object " .. object .. " in bucket " .. bucket .. " are unavailable. Please try again later " .. hosts_text
             exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
 
         elseif host == false then
@@ -78,7 +78,6 @@ local function get_object(internal, bucket, object)
             -- find a valid host to redirect to. 302.
             local sites = common.get_object_replica_sites(bucket, object)
             local hosts = common.get_replica_hosts(bucket, object, sites)
-            local host = common.get_host_with_object(hosts, bucket, object)
 
             -- Easier to understand what is happening when debugging
             local hosts_text = "["
@@ -87,8 +86,9 @@ local function get_object(internal, bucket, object)
             end
             hosts_text = hosts_text .. " ]"
         
+            local host = common.get_host_with_object(hosts, bucket, object)
             if host == nil then
-                msg = "All the replica hosts for object " .. object .. " in bucket " .. bucket .. " are unavailable. Please try again later."
+                msg = "All the replica hosts for object " .. object .. " in bucket " .. bucket .. " are unavailable. Please try again later " .. hosts_text
                 exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
 
             elseif host == false then
