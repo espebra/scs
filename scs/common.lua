@@ -29,7 +29,7 @@ function M.get_host_status(host)
     -- Return only true / false
     if value == nil then
         value = false
-    else
+    end
 
     -- if value then
     --     ngx.log(ngx.ERR,"Host " .. host .. " is up")
