@@ -25,6 +25,12 @@ end
 function M.get_host_status(host)
     local s = ngx.shared.status
     local value, flags = s:get(host)
+
+    -- Return only true / false
+    if value == nil then
+        value = false
+    else
+
     -- if value then
     --     ngx.log(ngx.ERR,"Host " .. host .. " is up")
     -- else
