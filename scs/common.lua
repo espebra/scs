@@ -132,18 +132,55 @@ function M.generate_url(host, port, object)
 end
 
 function M.get_configuration()
-    local path = "/etc/scs/scs.json"
-    local config = read_json_file(path, true)
-    return config
+    local conf = ngx.shared.conf
+    if not conf then
+        local path = "/etc/scs/scs.json"
+        conf = read_json_file(path, true)
+        ngx.shared.conf = conf
+        ngx.log(ngx.ERR, "Caching: Configuration")
+    end
+    return conf
+end
+
+-- Return a table containing the hosts in a given site
+function M.get_site_hosts(site)
+    local hosts = ngx.shared[site]
+    if not hosts then
+        hosts = {}
+        local conf = M.get_configuration()
+        for host,h in pairs(conf.current.hosts) do
+            if h['site'] == site then
+                table.insert(hosts,host)
+                ngx.log(ngx.ERR,"Caching: Host " .. host .. " is in site " ..  h['site'])
+            end
+        end
+        ngx.shared[site] = hosts
+    end
+    return hosts
 end
 
 -- Return a table containing the sites in the configuration
-function M.get_all_sites(config)
-    local sites = {}
-    for site,_ in pairs(config.current.hosts) do
-        table.insert(sites,site)
+function M.get_all_sites()
+    local sites = ngx.shared.sites
+    if not sites then
+        sites = {}
+        local conf = M.get_configuration()
+        for host,h in pairs(conf.current.hosts) do
+            if not M.inTable(sites, h['site']) then
+                table.insert(sites,h['site'])
+                ngx.log(ngx.ERR,"Caching: Site " .. h['site'] .. " is one of our sites")
+            end
+        end
+        ngx.shared.sites = sites
     end
     return sites
+end
+
+function M.inTable(tbl, item)
+    for key, value in pairs(tbl) do
+        if value == item then return key end
+    end
+    return false
 end
 
 -- Return a table with the sites where a given object fits according to the
@@ -171,7 +208,8 @@ function M.get_replica_site_hosts(bucket, object, site)
     local hash_map = ngx.shared[site]
     if not hash_map then
         -- If the hash map does not exist, create it and store it for later use
-        hash_map = M.create_hash_map(config.current.hosts[site])
+        local hosts = M.get_site_hosts(site)
+        hash_map = M.create_hash_map(hosts)
         ngx.shared[site] = hash_map
     end
     -- Now we have a hash map, either created or read from memory. Use it to
@@ -199,12 +237,12 @@ end
 -- hash ring.
 function M.get_replica_sites(bucket, object)
     -- Try to read the hash map from shared memory
-    local hash_map = ngx.shared.sites
+    local hash_map = ngx.shared.sites_hash_map
     if not hash_map then
         -- If the hash map does not exist, create it and store it for later use
-        local sites = M.get_all_sites(config)
+        local sites = M.get_all_sites()
         hash_map = M.create_hash_map(sites)
-        ngx.shared.sites = site_hash_map
+        ngx.shared.sites_hash_map = hash_map
     end
     -- Now we have a hash map, either created or read from memory. Use it to
     -- figure out which sites to use for this object.
@@ -214,17 +252,23 @@ function M.get_replica_sites(bucket, object)
     return result
 end
 
+-- Function to randomize a table
+function M.randomize_table(t)
+    for i = #t, 2, -1 do
+        -- select a random number between 1 and i
+        local r = math.random(i)
+         -- swap the randomly selected item to position i
+        t[i], t[r] = t[r], t[i]
+    end
+    return t
+end
+
 -- Figure out exactly which host to use from the hosts given from the hash
 -- ring lookup,
 function M.get_host_with_object(hosts, bucket, object)
     -- Randomize the hosts table
     -- backwards
-    for i = #hosts, 2, -1 do
-        -- select a random number between 1 and i
-        local r = math.random(i)
-         -- swap the randomly selected item to position i
-        hosts[i], hosts[r] = hosts[r], hosts[i]
-    end
+    hosts = M.randomize_table(hosts)
 
     local port = config.current.bind_port
 
@@ -276,19 +320,6 @@ function M.get_available_replica_hosts(hosts)
 
     -- If any of the hosts are available, return nil
     return available_hosts
-end
-
--- Read the configuration
-function M.get_cached_configuration()
-    -- Try to read the configuration from the shared memory
-    local conf = ngx.shared.conf
-    if not conf then
-        conf = M.get_configuration()
-        ngx.shared.conf = conf
-        ngx.log(ngx.ERR, "Caching configuration")
-    end
-
-    return conf
 end
 
 function M.object_fits_on_this_host(hosts)

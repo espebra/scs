@@ -1,5 +1,5 @@
 local common = require "scs.common"
--- local timer = require "scs.timer"
+local timer = require "scs.timer"
 
 --local http = require "libs.resty.http.simple"
 --local Flexihash = require 'libs.Flexihash'
@@ -200,8 +200,7 @@ local function delete_object(internal, bucket, object)
     return exitcode, msg
 end
 
--- local delay = 5
--- timer.initiate_periodic_health_checks(delay)
+timer.initiate_periodic_health_checks(5)
 
 ngx.header["server"] = nil
 local h = ngx.req.get_headers()
@@ -255,10 +254,10 @@ local r = {
 }
 
 -- If the preflight checks went OK, go on with the real work here
-config = common.get_cached_configuration()
+config = common.get_configuration()
 
+--exitcode, msg = route.request(r)
 if not exitcode then
-    --exitcode, msg = route.request(r)
     local method = r['method']
     if method == 'HEAD' then
         exitcode, msg = head_object(internal, bucket, object)
