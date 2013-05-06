@@ -6,20 +6,36 @@ local http = require "resty.http.simple"
 local ngx = require "ngx"
 
 -- Read a json file
-local function read_json_file(path, required)
+local function read_file(path, required)
     local f = nil
-    local conf = {}
+    local content = false
     if required then
         f = assert(io.open(path, "r"))
     else
         f = io.open(path, "r")
     end
     if f then
-        local c = f:read("*all")
+        content = f:read("*all")
         f:close()
-        conf = cjson.decode(c)
     end
-    return conf
+    return content
+end
+
+-- Update the status for a host
+function M.update_host_status(host,status)
+    local s = ngx.shared.status
+    local success, err, forcible
+    if status then
+        success, err, forcible = s:set(host, true)
+    else
+        success, err, forcible = s:set(host, false)
+    end
+    if success then
+        return true
+    else
+        ngx.log(ngx.ERR,"Failed to cache status for host " .. host .. ": " .. err)
+        return false
+    end
 end
 
 -- Verify that the bucket name is valid
@@ -152,19 +168,22 @@ function M.get_storage_directory()
 end
 
 function M.get_configuration()
-    local conf = ngx.shared.conf
-    if not conf then
+    local c = ngx.shared.conf
+    local json = c:get('conf')
+    -- local conf, flags = c:get('conf')
+    if not json then
         local path = "/etc/scs/scs.json"
-        conf = read_json_file(path, true)
-        ngx.shared.conf = conf
+        json = read_file(path, true)
+        c:set('conf', json)
         ngx.log(ngx.ERR, "Caching: Configuration")
     end
+    local conf = cjson.decode(json)
     return conf
 end
 
 -- Return a table containing the hosts in a given site
 function M.get_site_hosts(site)
-    local hosts = ngx.shared[site]
+    local hosts = ngx.shared.sites[site]
     if not hosts then
         hosts = {}
         local conf = M.get_configuration()
@@ -174,8 +193,9 @@ function M.get_site_hosts(site)
                 ngx.log(ngx.ERR,"Caching: Host " .. host .. " is in site " ..  h['site'])
             end
         end
-        ngx.shared[site] = hosts
+        ngx.shared.sites[site] = hosts
     end
+    -- ngx.log(ngx.ERR,"Returned " .. #hosts .. " hosts in site " .. site)
     return hosts
 end
 
@@ -361,4 +381,3 @@ function M.is_internal_request(useragent)
 end
 
 return M
-
