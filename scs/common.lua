@@ -356,39 +356,39 @@ function M.get_host_with_object(hosts, bucket, object)
     return status
 end
 
-function M.get_available_replica_hosts(hosts)
-    -- Randomize the hosts table
-    -- backwards
-    for i = #hosts, 2, -1 do
-        -- select a random number between 1 and i
-        local r = math.random(i)
-         -- swap the randomly selected item to position i
-        hosts[i], hosts[r] = hosts[r], hosts[i]
-    end
-
-    -- For each host, check if the object is available. Return the first
-    -- host that has the object available.
-    local port = M.get_bind_port()
-    local available_hosts = {}
-    local threads = {}
-    for i,host in pairs(hosts) do
-        if M.get_host_status(host) then
-            table.insert(threads,ngx.thread.spawn(M.remote_host_availability, host, port))
-        end
-    end
-
-    for i = 1, #threads do
-        local ok, res = ngx.thread.wait(threads[i])
-        if ok then
-            if res then
-                table.insert(available_hosts, hosts[i])
-            end
-        end
-    end
-
-    -- If any of the hosts are available, return nil
-    return available_hosts
-end
+-- function M.get_available_replica_hosts(hosts)
+--     -- Randomize the hosts table
+--     -- backwards
+--     for i = #hosts, 2, -1 do
+--         -- select a random number between 1 and i
+--         local r = math.random(i)
+--          -- swap the randomly selected item to position i
+--         hosts[i], hosts[r] = hosts[r], hosts[i]
+--     end
+-- 
+--     -- For each host, check if the object is available. Return the first
+--     -- host that has the object available.
+--     local port = M.get_bind_port()
+--     local available_hosts = {}
+--     local threads = {}
+--     for i,host in pairs(hosts) do
+--         if M.get_host_status(host) then
+--             table.insert(threads,ngx.thread.spawn(M.remote_host_availability, host, port))
+--         end
+--     end
+-- 
+--     for i = 1, #threads do
+--         local ok, res = ngx.thread.wait(threads[i])
+--         if ok then
+--             if res then
+--                 table.insert(available_hosts, hosts[i])
+--             end
+--         end
+--     end
+-- 
+--     -- If any of the hosts are available, return nil
+--     return available_hosts
+-- end
 
 function M.object_fits_on_this_host(hosts)
     for _,host in pairs(hosts) do

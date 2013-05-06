@@ -156,13 +156,16 @@ local function post_object(internal, bucket, object)
             ngx.eof()
         end
 
-        local available_hosts = common.get_available_replica_hosts(hosts)
-        for _,host in pairs(available_hosts) do
-            local res = common.sync_object("/srv/files", host, bucket, object_base64)
-            if res then
-                ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " succeeded.")
+        for _,host in pairs(hosts) do
+            if common.get_host_status(host) then
+                local res = common.sync_object("/srv/files", host, bucket, object_base64)
+                if res then
+                    ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " succeeded.")
+                else
+                    ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " failed.")
+                end
             else
-                ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " failed.")
+                ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " not initiated. The host is down.")
             end
         end
 
@@ -174,24 +177,22 @@ local function post_object(internal, bucket, object)
             exitcode = 503
         end
     else
-        local available_hosts = common.get_available_replica_hosts(hosts)
         local host = nil
-        if #available_hosts > 0 then
-            host = available_hosts[1]
-        end
-
-        -- Easier to understand what is happening when debugging
         local hosts_text = "["
-        for _,host in pairs(hosts) do
-            hosts_text = hosts_text .. " " .. host 
+        for _,h in pairs(hosts) do
+            if common.get_host_status(h) then
+                host = h
+            end
+            hosts_text = hosts_text .. " " .. h 
         end
         hosts_text = hosts_text .. " ]"
-        
+
         if host == nil then
             msg = 'None of the hosts for object ' .. object .. ' in bucket ' .. bucket .. ' are available at the moment ' .. hosts_text
             exitcode = 503
         else
             -- Redirect to one of the corrent hosts here. 307.
+            ngx.log(ngx.ERR,"Found " .. #hosts .. " available hosts, selected " .. host)
             local port = common.get_bind_port()
             local url = common.generate_url(host,port,object)
             ngx.header["Location"] = url
