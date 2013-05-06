@@ -155,9 +155,9 @@ function M.generate_url(host, port, object)
     return url
 end
 
-function M.get_writeback()
+function M.get_write_back()
     local conf = M.get_configuration()
-    return conf.current.write-back
+    return conf.current.write_back
 end
 
 function M.get_replicas_per_site()

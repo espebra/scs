@@ -150,9 +150,9 @@ local function post_object(internal, bucket, object)
         tmpfile:close()
         realfile:close()
 
-        -- Finish the request here if the configuration is set to writeback.
-        local writeback = common.get_writeback()
-        if writeback then
+        -- Finish the request here if the configuration is set to write back.
+        local write_back = common.get_write_back()
+        if write_back then
             ngx.eof()
         end
 
