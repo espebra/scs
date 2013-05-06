@@ -318,6 +318,9 @@ function M.get_host_with_object(hosts, bucket, object)
     -- backwards
     hosts = M.randomize_table(hosts)
 
+    -- Return nil if no hosts are up
+    local status = nil
+
     local port = M.get_bind_port()
 
     -- For each host, check if the object is available. Return the first
@@ -326,6 +329,8 @@ function M.get_host_with_object(hosts, bucket, object)
     for i,host in pairs(hosts) do
         -- Only test hosts that are up
         if M.get_host_status(host) then
+            -- At least one host is up. Let's change the exit status to false
+            status = false
             table.insert(threads,ngx.thread.spawn(M.object_exists_on_remote_host, true, host, port, bucket, object))
         end
     end
@@ -338,7 +343,7 @@ function M.get_host_with_object(hosts, bucket, object)
             return res
         end
     end
-    return nil
+    return status
 end
 
 function M.get_available_replica_hosts(hosts)
