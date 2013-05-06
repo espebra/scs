@@ -157,7 +157,7 @@ end
 
 function M.get_writeback()
     local conf = M.get_configuration()
-    return conf.current.writeback
+    return conf.current.write-back
 end
 
 function M.get_replicas_per_site()
