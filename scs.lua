@@ -9,42 +9,42 @@ local function head_object(internal, bucket, object)
     local exitcode = ngx.HTTP_NOT_FOUND
     local msg = nil
 
-    -- See if the object exists locally
     local object_base64 = ngx.encode_base64(object)
     local dir = common.get_storage_directory()
+
+    -- See if the object exists locally
     if common.object_exists_locally(dir, bucket, object_base64) then
         exitcode = ngx.HTTP_OK
         msg = "The object " .. object .. " in bucket " .. bucket .. " exists locally."
-    end
+    else
+        if not internal then
+            -- Redirect to another host if this is not an internal request
+            local sites = common.get_object_replica_sites(bucket, object)
+            local hosts = common.get_replica_hosts(bucket, object, sites)
 
-    -- The object do not exist locally
-    if not internal then
-        -- Redirect to another host if this is not an internal request
-        local sites = common.get_object_replica_sites(bucket, object)
-        local hosts = common.get_replica_hosts(bucket, object, sites)
-
-        -- Easier to understand what is happening when debugging
-        local hosts_text = "["
-        for _,host in pairs(hosts) do
-            hosts_text = hosts_text .. " " .. host 
-        end
-        hosts_text = hosts_text .. " ]"
+            -- Easier to understand what is happening when debugging
+            local hosts_text = "["
+            for _,host in pairs(hosts) do
+                hosts_text = hosts_text .. " " .. host 
+            end
+            hosts_text = hosts_text .. " ]"
     
-        local host = common.get_host_with_object(hosts, bucket, object)
-        if host == nil then
-            msg = "All the replica hosts for object " .. object .. " in bucket " .. bucket .. " are unavailable. Please try again later " .. hosts_text
-            exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
+            local host = common.get_host_with_object(hosts, bucket, object)
+            if host == nil then
+                msg = "All the replica hosts for object " .. object .. " in bucket " .. bucket .. " are unavailable. Please try again later " .. hosts_text
+                exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
 
-        elseif host == false then
-            msg = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts " .. hosts_text
-            exitcode = ngx.HTTP_NOT_FOUND
+            elseif host == false then
+                msg = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts " .. hosts_text
+                exitcode = ngx.HTTP_NOT_FOUND
 
-        else
-            local port = common.get_bind_port()
-            local url = common.generate_url(host,port,object)
-            msg = 'Redirecting HEAD request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
-            ngx.header["Location"] = url
-            exitcode = ngx.HTTP_MOVED_TEMPORARILY
+            else
+                local port = common.get_bind_port()
+                local url = common.generate_url(host,port,object)
+                msg = 'Redirecting HEAD request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
+                ngx.header["Location"] = url
+                exitcode = ngx.HTTP_MOVED_TEMPORARILY
+            end
         end
     end
     return exitcode, msg
