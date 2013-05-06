@@ -21,6 +21,13 @@ local function read_file(path, required)
     return content
 end
 
+-- Return the host availability
+function M.get_host_status(host)
+    local s = ngx.shared.status
+    local value, flags = s:get(host)
+    return value
+end
+
 -- Update the status for a host
 function M.update_host_status(host,status)
     local s = ngx.shared.status
@@ -117,6 +124,7 @@ function M.remote_host_availability(host, port)
         headers = headers
     })
     if not res then
+        ngx.log(ngx.ERR,"Unable to connect to " .. host .. ": " .. err)
         return nil
     end
     if res.status >= 200 and res.status < 300 then
@@ -316,7 +324,10 @@ function M.get_host_with_object(hosts, bucket, object)
     -- host that has the object available.
     local threads = {}
     for i,host in pairs(hosts) do
-        threads[i] = ngx.thread.spawn(M.object_exists_on_remote_host, true, host, port, bucket, object)
+        -- Only test hosts that are up
+        if M.get_host_status(host) then
+            table.insert(threads,ngx.thread.spawn(M.object_exists_on_remote_host, true, host, port, bucket, object))
+        end
     end
 
     for i = 1, #threads do
