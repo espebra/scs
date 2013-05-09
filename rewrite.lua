@@ -7,16 +7,15 @@ local cjson = require 'cjson'
 
 local function get_object(internal, bucket, object)
     local exitcode = ngx.HTTP_NOT_FOUND
-    local msg = nil
+    local msg
     -- See if the object exists locally
     local object_base64 = ngx.encode_base64(object)
     local dir = common.get_storage_directory()
     if common.object_exists_locally(dir, bucket, object_base64) then
-        local uri = "/internal/" .. bucket .. "/" .. object_base64
+        --local uri = "/" .. bucket .. "/" .. object_base64
+        local uri = "/" .. bucket .. "/" .. object_base64
         ngx.log(ngx.ERR,"Rewriting URI " .. ngx.var.uri .. " to " .. uri)
-        local msg = "Object " .. object .. " in bucket " .. bucket .. " delivered successfully to the client."
-        ngx.req.set_uri(uri)
-        exitcode = ngx.HTTP_OK
+        ngx.req.set_uri(uri,true)
     else
         -- The object do not exist locally
         if not internal then
@@ -36,16 +35,12 @@ local function get_object(internal, bucket, object)
             if host == nil then
                 msg = "All the replica hosts for object " .. object .. " in bucket " .. bucket .. " are unavailable. Please try again later " .. hosts_text
                 exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
-
             elseif host == false then
                 msg = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts " .. hosts_text
                 exitcode = ngx.HTTP_NOT_FOUND
-
             else
                 local port = common.get_bind_port()
                 local url = common.generate_url(host,port,object)
-                -- ngx.say("Host: " .. host)
-                -- ngx.say("Redirect to: " .. url)
                 msg = 'Redirecting GET request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
                 ngx.header["Location"] = url
                 exitcode = ngx.HTTP_MOVED_TEMPORARILY
@@ -111,6 +106,7 @@ if not exitcode then
     local method = r['method']
     if method == "GET" then
         exitcode, msg = get_object(internal, bucket, object)
+    end
 end
 
 local elapsed = ngx.now() - ngx.req.start_time()
