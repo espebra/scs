@@ -5,11 +5,13 @@ local timer = require "scs.timer"
 --local Flexihash = require 'libs.Flexihash'
 local cjson = require 'cjson'
 
-local function get_object(internal, bucket, object)
+local function rewrite_request(r)
     local exitcode = ngx.HTTP_NOT_FOUND
     local msg
     -- See if the object exists locally
-    local object_base64 = ngx.encode_base64(object)
+    local object = r['object']
+    local bucket = r['bucket']
+    local object_base64 = r['object_base64']
     local dir = common.get_storage_directory()
     if common.object_exists_locally(dir, bucket, object_base64) then
         --local uri = "/" .. bucket .. "/" .. object_base64
@@ -18,7 +20,7 @@ local function get_object(internal, bucket, object)
         ngx.req.set_uri(uri,true)
     else
         -- The object do not exist locally
-        if not internal then
+        if ngx.is_subrequest then
             -- We do not have the file locally. Should lookup the hash table to
             -- find a valid host to redirect to. 302.
             local sites = common.get_object_replica_sites(bucket, object)
@@ -47,7 +49,7 @@ local function get_object(internal, bucket, object)
             end
         end
     end
-    return exitcode, msg
+    ngx.exit(exitcode)
 end
 
 ngx.header["server"] = nil
@@ -104,21 +106,24 @@ local r = {
 --exitcode, msg = route.request(r)
 if not exitcode then
     local method = r['method']
-    if method == "GET" then
-        exitcode, msg = get_object(internal, bucket, object)
+    if method == "GET" or method == "HEAD" then
+        --exitcode, msg = rewrite_request(r)
+        rewrite_request(r)
     end
 end
 
-local elapsed = ngx.now() - ngx.req.start_time()
-if not ngx.headers_sent then
-    ngx.header["x-elapsed"] = elapsed
-end
-
-if debug then
-    if msg then
-        ngx.log(ngx.ERR, "Req time: " .. elapsed .. " sec. " .. msg)
-    else
-        ngx.log(ngx.ERR, "Req time: " .. elapsed .. " sec. No message")
-    end
-end
-ngx.exit(exitcode)
+-- local elapsed = ngx.now() - ngx.req.start_time()
+-- if not ngx.headers_sent then
+--     if elapsed > 0 then
+--         ngx.header["x-elapsed"] = elapsed
+--     end
+-- end
+-- 
+-- if debug then
+--     if msg then
+--         ngx.log(ngx.ERR, "Req time: " .. elapsed .. " sec. " .. msg)
+--     else
+--         ngx.log(ngx.ERR, "Req time: " .. elapsed .. " sec. No message")
+--     end
+-- end
+-- ngx.exit(exitcode)

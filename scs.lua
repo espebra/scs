@@ -193,7 +193,7 @@ local function post_object(internal, bucket, object)
             exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
         else
             -- Redirect to one of the corrent hosts here. 307.
-            ngx.log(ngx.ERR,"Found " .. #hosts .. " available hosts, selected " .. host)
+            --ngx.log(ngx.ERR,"Found " .. #hosts .. " available hosts, selected " .. host)
             local port = common.get_bind_port()
             local url = common.generate_url(host,port,object)
             ngx.header["Location"] = url
@@ -289,7 +289,9 @@ end
 
 local elapsed = ngx.now() - ngx.req.start_time()
 if not ngx.headers_sent then
-    ngx.header["x-elapsed"] = elapsed
+    if elapsed > 0 then
+        ngx.header["x-elapsed"] = elapsed
+    end
 end
 
 if debug then
