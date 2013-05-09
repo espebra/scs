@@ -12,6 +12,7 @@ local function rewrite_request(r)
     local object = r['object']
     local bucket = r['bucket']
     local object_base64 = r['object_base64']
+    local internal = r['internal']
     local dir = common.get_storage_directory()
     if common.object_exists_locally(dir, bucket, object_base64) then
         --local uri = "/" .. bucket .. "/" .. object_base64
@@ -20,7 +21,7 @@ local function rewrite_request(r)
         ngx.req.set_uri(uri,true)
     else
         -- The object do not exist locally
-        if ngx.is_subrequest then
+        if not internal then
             -- We do not have the file locally. Should lookup the hash table to
             -- find a valid host to redirect to. 302.
             local sites = common.get_object_replica_sites(bucket, object)
