@@ -6,6 +6,7 @@ local timer = require "scs.timer"
 local cjson = require 'cjson'
 
 local function rewrite_request(r)
+    ngx.log(ngx.ERR,"This should have been rewritten.")
     local exitcode = ngx.HTTP_NOT_FOUND
     local msg
     -- See if the object exists locally
@@ -18,7 +19,7 @@ local function rewrite_request(r)
         --local uri = "/" .. bucket .. "/" .. object_base64
         local uri = "/" .. bucket .. "/" .. object_base64
         ngx.log(ngx.ERR,"Rewriting URI " .. ngx.var.uri .. " to " .. uri)
-        ngx.req.set_uri(uri,true)
+        ngx.req.set_uri(uri)
     else
         -- The object do not exist locally
         if not internal then

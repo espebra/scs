@@ -14,6 +14,11 @@ local function rewrite_request(r)
     local object_base64 = r['object_base64']
     local internal = r['internal']
     local dir = common.get_storage_directory()
+    if not internal then
+        ngx.log(ngx.ERR,"Not internal")
+    else
+        ngx.log(ngx.ERR,"Internal")
+    end
     if common.object_exists_locally(dir, bucket, object_base64) then
         --local uri = "/" .. bucket .. "/" .. object_base64
         local uri = "/" .. bucket .. "/" .. object_base64
