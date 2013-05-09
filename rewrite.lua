@@ -103,27 +103,10 @@ local r = {
   ['debug'] = debug, -- Add debug information in the response
 }
 
---exitcode, msg = route.request(r)
 if not exitcode then
     local method = r['method']
     if method == "GET" or method == "HEAD" then
-        --exitcode, msg = rewrite_request(r)
         rewrite_request(r)
     end
 end
 
--- local elapsed = ngx.now() - ngx.req.start_time()
--- if not ngx.headers_sent then
---     if elapsed > 0 then
---         ngx.header["x-elapsed"] = elapsed
---     end
--- end
--- 
--- if debug then
---     if msg then
---         ngx.log(ngx.ERR, "Req time: " .. elapsed .. " sec. " .. msg)
---     else
---         ngx.log(ngx.ERR, "Req time: " .. elapsed .. " sec. No message")
---     end
--- end
--- ngx.exit(exitcode)
