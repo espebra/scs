@@ -163,7 +163,12 @@ function M.object_exists_on_remote_host(host, port, bucket, object)
     headers['x-bucket'] = bucket
     headers['user-agent'] = "scs internal"
 
-    return M.http_request(host, port, headers, method, path)
+    local res = M.http_request(host, port, headers, method, path)
+    if res then
+        return host
+    else
+        return res
+    end
 end
 
 function M.remote_host_availability(host, port)
@@ -173,12 +178,7 @@ function M.remote_host_availability(host, port)
     headers['x-status'] = true
     headers['user-agent'] = "scs internal"
 
-    local res = M.http_request(host, port, headers, method, path)
-    if res then
-        return host
-    else
-        return res
-    end
+    return M.http_request(host, port, headers, method, path)
 end
 
 -- Create a consistent hash of the values given in a table
