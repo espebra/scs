@@ -58,7 +58,7 @@ Copy the example init script.
 
     # cp /srv/scs/conf/scs.init.example /etc/init.d/scs
 
-Each bucket needs a proper fqdn, so create the DNS entry *somebucket.scs.company.com* and point it to one of your nodes (for SPOF lab setup) or to a service IP address that may be available on any of your nodes using anycast and/or IP failover (for production like setups).
+Each bucket needs a proper fqdn, so create the DNS entry *somebucket.scs.company.com* and point it to one of your hosts (for a SPOF lab setup) or to a service IP address that may be available on any of your hosts using anycast and/or IP failover (for production like setups).
 
 You should now be good to go.
 
