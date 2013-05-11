@@ -1,10 +1,11 @@
 # Simple Cloud Storage
 
 This is a proof of concept minimalistic distributed object store implemented in
-Lua. 
+Lua, based on the OpenResty web application server. 
 
 ## Features
 
+* Quite fast
 * Stateless
 * Non-SPOF
 * Multi location
@@ -12,7 +13,8 @@ Lua.
 
 ## Design principles
 
-* Requests can be sent to any of the hosts. The requests will be redirected to one of the correct ones. This is suitable for anycast.
+* Keep it simple.
+* Requests can be sent to any of the hosts. The client will be redirected to one of the replica hosts for that specific request. This will provide high availability when used with anycast and/or IP failover.
 * Automatic rebalancing if hosts are down is not necessary. It is sufficient to rebalance when hosts are added and/or removed from the configuration file.
 * Stateless is robust.
 
