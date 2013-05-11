@@ -470,7 +470,7 @@ function M.parse_request()
     if args['bucket'] then
         bucket = args['bucket']
     else
-        bucket = ngx.var.hostname
+        bucket = h['host']
     end
 
     if not bucket then
