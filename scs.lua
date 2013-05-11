@@ -38,7 +38,7 @@ local function lookup_object(r)
             exitcode = ngx.HTTP_NOT_FOUND
         else
             local port = common.get_bind_port()
-            local url = common.generate_url(host,port,object)
+            local url = common.generate_url(host,port,object,bucket)
             msg = 'Redirecting GET request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
             ngx.header["Location"] = url
             exitcode = ngx.HTTP_MOVED_TEMPORARILY
@@ -137,7 +137,7 @@ local function post_object(r)
             -- Redirect to one of the corrent hosts here. 307.
             --ngx.log(ngx.ERR,"Found " .. #hosts .. " available hosts, selected " .. host)
             local port = common.get_bind_port()
-            local url = common.generate_url(host,port,object)
+            local url = common.generate_url(host,port,object,bucket)
             ngx.header["Location"] = url
             msg = 'Redirecting POST request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
             exitcode = 307

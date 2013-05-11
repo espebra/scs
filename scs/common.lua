@@ -67,7 +67,7 @@ function M.verify_bucket(bucket)
     if #bucket > 40 then
         return false
     end
-    if not ngx.re.match(bucket, '^[a-zA-Z0-9]+$','j') then
+    if not ngx.re.match(bucket, '^[a-zA-Z0-9-]+$','j') then
         return false
     end
     return true
@@ -157,9 +157,8 @@ end
 -- Check if an object exists on a remote host
 function M.object_exists_on_remote_host(host, port, bucket, object)
     local method = "HEAD"
-    local path = "/" .. object
+    local path = "/" .. object .. "?bucket=" .. bucket
     local headers = {}
-    headers['x-bucket'] = bucket
     headers['user-agent'] = "scs internal"
 
     local res = M.http_request(host, port, headers, method, path)
@@ -190,12 +189,12 @@ function M.create_hash_map(values)
     return hash_map
 end
 
-function M.generate_url(host, port, object)
+function M.generate_url(host, port, object, bucket)
     local url
     if port == 80 then
-        url = "http://" .. host .. "/" .. object
+        url = "http://" .. host .. "/" .. object .. "?bucket=" .. bucket
     else
-        url = "http://" .. host .. ":" .. port .. "/" .. object
+        url = "http://" .. host .. ":" .. port .. "/" .. object .. "?bucket=" .. bucket
     end
     return url
 end
@@ -466,7 +465,13 @@ function M.parse_request()
     local internal = M.is_internal_request(h['user-agent'])
     local debug = h['x-debug']
     local status = h['x-status']
-    local bucket = h['x-bucket']
+
+    local args = ngx.req.get_uri_args()
+    if args['bucket'] then
+        bucket = args['bucket']
+    else
+        bucket = ngx.var.hostname
+    end
 
     -- Read the object name, and remove the first char (which is a /)
     local object = string.sub(ngx.var.request_uri, 2)
