@@ -107,7 +107,7 @@ function M.http_request(host, port, headers, method, path)
         headers = headers
     })
     if not res then
-        ngx.log(ngx.ERR,"Unable to execute " .. method .. " to " .. host .. ":" .. port .. path .. ": " .. err)
+        ngx.log(ngx.ERR,"Unable to execute " .. method .. " to http://" .. host .. ":" .. port .. path .. ": " .. err)
         return nil
     end
     if res.status >= 200 and res.status < 300 then
