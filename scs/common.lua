@@ -510,6 +510,9 @@ function M.parse_request()
         -- Add debug information in the response
         ['debug'] = debug, 
     }
+
+    -- Clean up
+    ngx.header['server'] = nil
     return r
 end
 
