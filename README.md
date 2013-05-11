@@ -70,7 +70,7 @@ The following will upload the content of the file *sourcefile* to the bucket *so
 
     # curl -L -H 'expect: 100-continue' --data-binary "@sourcefile" http://somebucket.scs.company.com/targetfile
 
-The file *targetfile* will be stored on the number of replica hosts as specified in your */etc/scs/scs.json*. The filename will be base64 encoded to allow weird characters. The file *targetfile* will be stored on the replica hosts in */srv/files/somebucket/d/G/dGFyZ2V0ZmlsZcKg*.
+The file *targetfile* will be stored on the number of replica hosts as specified in your */etc/scs/scs.json*. The filename will be base64 encoded to allow weird characters. The file *targetfile* will be stored on the replica hosts in */srv/files/somebucket/d/G/F/dGFyZ2V0ZmlsZcKg*.
 
 ### Download
 
