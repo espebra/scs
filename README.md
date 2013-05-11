@@ -60,7 +60,7 @@ Copy the example init script.
 
 You should now be good to go.
 
-## Usage
+## Example usage
 
 ### Upload
 
