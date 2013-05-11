@@ -473,8 +473,12 @@ function M.parse_request()
         bucket = ngx.var.hostname
     end
 
+    if not bucket then
+        ngx.log(ngx.ERR,"Bucket is not set")
+    end
+
     -- Read the object name, and remove the first char (which is a /)
-    local object = string.sub(ngx.var.request_uri, 2)
+    local object = string.sub(ngx.var.uri, 2)
     -- Unescape the filename of the object before hashing
     object = ngx.unescape_uri(object)
 
