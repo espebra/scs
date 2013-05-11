@@ -98,50 +98,86 @@ function M.is_file(path)
     end
 end
 
--- Check if an object exists on a remote host
-function M.object_exists_on_remote_host(internal,host,port,bucket,object)
-    headers = {}
-    headers['x-bucket'] = bucket
-    headers['user-agent'] = "scs internal"
-
+function M.http_request(host, port, headers, method, path)
     local res, err = http.request(host, port, {
-        method  = "HEAD",
+        method  = method,
         version = 0,
-        path    = "/" .. object,
+        path    = path,
         timeout = 1000,
         headers = headers
     })
     if not res then
-        -- ngx.say("http failure: ", err)
+        ngx.log(ngx.ERR,"Unable to execute " .. method .. " to " .. host .. ":" .. port .. path .. ": " .. err)
         return nil
     end
-    if res.status >= 200 and res.status < 300 then
-        return host
-    else
-        return false
-    end
-end
-
-function M.remote_host_availability(host, port)
-    headers = {}
-    headers['x-status'] = true
-    headers['user-agent'] = "scs internal"
-
-    local res, err = http.request(host, port, {
-        method  = "HEAD",
-        version = 0,
-        path    = "/",
-        timeout = 1000,
-        headers = headers
-    })
-    if not res then
-        ngx.log(ngx.ERR,"Unable to connect to " .. host .. ": " .. err)
-        return nil
-    end
+    ngx.log(ngx.ERR,"Executed with success " .. method .. " to " .. host .. ":" .. port .. path .. ": " .. res.status)
     if res.status >= 200 and res.status < 300 then
         return true
     else
         return false
+    end
+
+    -- local client = http:new()
+    -- client:set_timeout(1000)
+
+    -- local ok, err = client:connect(host, port)
+    -- if not ok then
+    --     ngx.log(ngx.ERR,"Failed to connect to " .. host .. ":" .. port .. ": " .. err)
+    --     return nil
+    -- end
+
+    -- local res, err = client:request({
+    --     method  = method,
+    --     path    = path,
+    --     headers = headers
+    -- })
+
+    -- if not res then
+    --     ngx.log(ngx.ERR,"Failed to retrieve " .. host .. path .. ": " .. err)
+    --     return nil
+    -- end
+
+    -- -- close connection, or put it into the connection pool
+    -- if res.headers["connection"] == "close" then
+    --     local ok, err = client:close()
+    --     if not ok then
+    --         ngx.log(ngx.ERR,"Failed to close: ", err)
+    --         return nil
+    --     end
+    -- else
+    --     client:set_keepalive(0, 100)
+    -- end
+
+    -- if res.status >= 200 and res.status < 300 then
+    --     return true
+    -- else
+    --     return false
+    -- end
+end
+
+-- Check if an object exists on a remote host
+function M.object_exists_on_remote_host(host, port, bucket, object)
+    local method = "HEAD"
+    local path = "/" .. object
+    local headers = {}
+    headers['x-bucket'] = bucket
+    headers['user-agent'] = "scs internal"
+
+    return M.http_request(host, port, headers, method, path)
+end
+
+function M.remote_host_availability(host, port)
+    local method = "HEAD"
+    local path = "/"
+    local headers = {}
+    headers['x-status'] = true
+    headers['user-agent'] = "scs internal"
+
+    local res = M.http_request(host, port, headers, method, path)
+    if res then
+        return host
+    else
+        return res
     end
 end
 
@@ -343,16 +379,17 @@ function M.get_host_with_object(hosts, bucket, object)
     for i,host in pairs(hosts) do
         -- Only test hosts that are up
         if M.get_host_status(host) then
+            --ngx.log(ngx.ERR,"Checking host " .. host)
             -- At least one host is up. Let's change the exit status to false
             status = false
-            table.insert(threads,ngx.thread.spawn(M.object_exists_on_remote_host, true, host, port, bucket, object))
+            table.insert(threads,ngx.thread.spawn(M.object_exists_on_remote_host, host, port, bucket, object))
         end
     end
 
     for i = 1, #threads do
         local ok, res = ngx.thread.wait(threads[i])
         if not ok then
-            ngx.log(ngx.ERR,"Thread " .. i .. " failed to run: " .. res)
+            ngx.log(ngx.ERR,"Thread " .. i .. " failed to run")
         else
             if res then
                 return res

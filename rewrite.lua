@@ -6,7 +6,7 @@ local timer = require "scs.timer"
 local cjson = require 'cjson'
 
 local function rewrite_request(r)
-    local exitcode = ngx.HTTP_NOT_FOUND
+    local exitcode
     local msg
     -- See if the object exists locally
     local object = r['object']
@@ -14,48 +14,12 @@ local function rewrite_request(r)
     local object_base64 = r['object_base64']
     local internal = r['internal']
     local dir = common.get_storage_directory()
-    if not internal then
-        ngx.log(ngx.ERR,"Not internal")
-    else
-        ngx.log(ngx.ERR,"Internal")
-    end
     if common.object_exists_locally(dir, bucket, object_base64) then
-        --local uri = "/" .. bucket .. "/" .. object_base64
         local uri = "/" .. bucket .. "/" .. object_base64
+        ngx.log(ngx.ERR,"Found " .. bucket .. "/" .. object .. " in local file system")
         ngx.log(ngx.ERR,"Rewriting URI " .. ngx.var.uri .. " to " .. uri)
-        ngx.req.set_uri(uri,true)
-    else
-        -- The object do not exist locally
-        if not internal then
-            -- We do not have the file locally. Should lookup the hash table to
-            -- find a valid host to redirect to. 302.
-            local sites = common.get_object_replica_sites(bucket, object)
-            local hosts = common.get_replica_hosts(bucket, object, sites)
-
-            -- Easier to understand what is happening when debugging
-            local hosts_text = "["
-            for _,host in pairs(hosts) do
-                hosts_text = hosts_text .. " " .. host 
-            end
-            hosts_text = hosts_text .. " ]"
-        
-            local host = common.get_host_with_object(hosts, bucket, object)
-            if host == nil then
-                msg = "All the replica hosts for object " .. object .. " in bucket " .. bucket .. " are unavailable. Please try again later " .. hosts_text
-                exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
-            elseif host == false then
-                msg = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts " .. hosts_text
-                exitcode = ngx.HTTP_NOT_FOUND
-            else
-                local port = common.get_bind_port()
-                local url = common.generate_url(host,port,object)
-                msg = 'Redirecting GET request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
-                ngx.header["Location"] = url
-                exitcode = ngx.HTTP_MOVED_TEMPORARILY
-            end
-        end
+        ngx.req.set_uri(uri, true)
     end
-    ngx.exit(exitcode)
 end
 
 ngx.header["server"] = nil
