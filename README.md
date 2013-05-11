@@ -58,6 +58,8 @@ Copy the example init script.
 
     # cp /srv/scs/conf/scs.init.example /etc/init.d/scs
 
+Each bucket needs a proper fqdn, so create the DNS entry *somebucket.scs.company.com* and point it to one of your nodes (for SPOF lab setup) or to a service IP address that may be available on any of your nodes using anycast and/or IP failover (for production like setups).
+
 You should now be good to go.
 
 ## Example usage
@@ -68,11 +70,15 @@ The following will upload the content of the file *sourcefile* to the bucket *so
 
     # curl -L -H 'expect: 100-continue' --data-binary "@sourcefile" http://somebucket.scs.company.com/targetfile
 
+The file *targetfile* will be stored on the number of replica hosts as specified in your */etc/scs/scs.json*. The filename will be base64 encoded to allow weird characters. The file *targetfile* will be stored on the replica hosts in */srv/files/somebucket/d/G/dGFyZ2V0ZmlsZcKg*.
+
 ### Download
 
-The following will download *targetfile* from the bucket *somebucket*.
+The following will download *targetfile* from the bucket *somebucket*. 
 
     # GET http://somebucket.scs.company.com/targetfile
+
+What happens is that the host that handles the request will lookup which hosts actually have *targetfile* on their local file systems (replica hosts), and redirect (302) your client to one of these - quite randomly.
 
 ## Troubleshooting
 
