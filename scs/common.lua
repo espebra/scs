@@ -285,9 +285,9 @@ function M.look_up_hash_map(hash, hash_map, replicas)
     return result
 end
 
-function M.sync_object(dir, host, bucket, object_base64)
+function M.sync_object(dir, depth, host, bucket, object_base64)
     --local cmd="/usr/bin/rsync -zSut " .. dir .. "/" .. bucket .. "/" .. object_base64 .. " rsync://" .. host .. "/scs/" .. bucket .. "/" .. object_base64
-    local cmd="/usr/bin/rsync -zSut " .. dir .. "/" .. bucket .. "/" .. object_base64 .. " rsync://" .. host .. "/scs/" .. bucket .. "/"
+    local cmd="cd " .. dir .. " && /usr/bin/rsync -RzSut " .. bucket .. "/" .. depth .. "/" .. object_base64 .. " rsync://" .. host .. "/scs"
     local res = os.execute(cmd)
     if res == 0 then
         return true
@@ -347,6 +347,17 @@ function M.get_object_replica_sites(bucket, object)
     local replicas = M.get_replica_sites()
     local result = M.look_up_hash_map(hash, hash_map, replicas)
     return result
+end
+
+function M.get_directory_depth(object_base64)
+    local dir = false
+    local m, err = ngx.re.match(object_base64, "^(.)(.)",'j')
+    if m then
+        if #m == 2 then
+            dir = m[1] .. "/" .. m[2]
+        end
+    end
+    return dir 
 end
 
 -- Function to randomize a table
@@ -466,11 +477,14 @@ function M.parse_request()
         bucket = false
     end
 
+    local object_base64 = ngx.encode_base64(object)
     local r = {
         -- Plain text name of the object
         ['object'] = object,
         -- Base64 name of the object
-        ['object_base64'] = ngx.encode_base64(object), 
+        ['object_base64'] = object_base64,
+        -- Dir
+        ['dir'] = M.get_directory_depth(object_base64),
         -- Request method (HEAD, GET, POST, ..)
         ['method'] = ngx.var.request_method, 
         -- Name of the bucket

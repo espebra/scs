@@ -47,7 +47,11 @@ local function lookup_object(r)
     return exitcode, msg
 end
 
-local function post_object(internal, bucket, object)
+local function post_object(r)
+    local internal = r['internal']
+    local bucket = r['bucket']
+    local object = r['object']
+
     local sites = common.get_object_replica_sites(bucket, object)
     local hosts = common.get_replica_hosts(bucket, object, sites)
     local exitcode = ngx.HTTP_NOT_FOUND
@@ -56,7 +60,7 @@ local function post_object(internal, bucket, object)
     local dir = common.get_storage_directory()
     if common.object_fits_on_this_host(hosts) then
         local object_base64 = ngx.encode_base64(object)
-        local path = dir .. "/" ..  bucket
+        local path = dir .. "/" .. bucket .. "/" .. r['dir']
         if not os.rename(path, path) then
             os.execute('mkdir -p ' .. path)
         end
@@ -88,7 +92,7 @@ local function post_object(internal, bucket, object)
         tmpfile:close()
         realfile:close()
 
-        if common.object_exists_locally(dir, bucket, object_base64) then
+        if common.is_file(dir .. "/" .. bucket .. "/" .. r['dir'] .. "/" .. object_base64) then
             msg = 'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system.'
             exitcode = ngx.HTTP_OK
         else
@@ -105,7 +109,7 @@ local function post_object(internal, bucket, object)
         -- Replicate the object to other hosts here.
         for _,host in pairs(hosts) do
             if common.get_host_status(host) then
-                local res = common.sync_object(dir, host, bucket, object_base64)
+                local res = common.sync_object(dir, r['dir'], host, bucket, object_base64)
                 if res then
                     ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " succeeded.")
                 else
@@ -165,7 +169,7 @@ local msg = nil
 --exitcode, msg = route.request(r)
 local method = r['method']
 if method == "POST" then
-    exitcode, msg = post_object(r['internal'], r['bucket'], r['object'])
+    exitcode, msg = post_object(r)
 elseif method == "PUT" then
     exitcode, msg = put_object(r['internal'], r['bucket'], r['object'])
 elseif method == "DELETE" then
