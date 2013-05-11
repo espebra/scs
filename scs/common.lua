@@ -467,14 +467,19 @@ function M.parse_request()
     local status = h['x-status']
 
     local args = ngx.req.get_uri_args()
+
+    -- The bucket is the value of the argument bucket, or the hostname in the
+    -- host header.
+    local bucket = nil
     if args['bucket'] then
         bucket = args['bucket']
     else
-        bucket = h['host']
-    end
-
-    if not bucket then
-        ngx.log(ngx.ERR,"Bucket is not set")
+        local m, err = ngx.re.match(ngx.var.host, '^([^.]+)','j')
+        if m then
+            if #m == 1 then
+                bucket = m[1] 
+            end
+        end
     end
 
     -- Read the object name, and remove the first char (which is a /)
