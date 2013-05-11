@@ -22,61 +22,16 @@ local function rewrite_request(r)
     end
 end
 
-ngx.header["server"] = nil
-local h = ngx.req.get_headers()
-local internal = common.is_internal_request(h['user-agent'])
-local debug = h['x-debug']
-local status = h['x-status']
-local bucket = h['x-bucket']
+local r = common.parse_request()
+timer.initiate_periodic_health_checks(1)
 
-local exitcode = nil
-local msg = nil
-
--- Return 200 immediately if the x-status header is set. This is to verify that
--- the host is up and running.
-if status and internal then
-    exitcode = ngx.HTTP_OK
-    msg = "Returning 200 to the status check."
+-- Return 200 to the status check
+if r['status'] and r['internal'] then
+    ngx.exit(ngx.HTTP_OK)
 end
 
-if not status and not bucket then
-    exitcode = ngx.HTTP_BAD_REQUEST
-    msg = "The request is missing the x-bucket header."
-end
-
-if not status and not common.verify_bucket(bucket) then
-    exitcode = ngx.HTTP_BAD_REQUEST
-    if bucket == nil then
-        msg = "Invalid bucket name."
-    else
-        msg = "Invalid bucket name (" .. bucket .. ")."
-    end
-end
-
--- Read the object name, and remove the first char (which is a /)
-local object = string.sub(ngx.var.request_uri, 2)
-if not status and string.len(object) == 0 then
-    exitcode = ngx.HTTP_BAD_REQUEST
-    msg = "The object name is not set."
-end
-
--- Unescape the filename of the object before hashing
-object = ngx.unescape_uri(object)
-
--- Assemble the request metadata table
-local r = {
-  ['object'] = object, -- Plain text name of the object
-  ['object_base64'] = ngx.encode_base64(object), -- Base64 name of the object
-  ['method'] = ngx.var.request_method, -- Request method (HEAD, GET, POST, ..)
-  ['bucket'] = bucket, -- Name of the bucket
-  ['internal'] = internal, -- True if internal signaling request
-  ['debug'] = debug, -- Add debug information in the response
-}
-
-if not exitcode then
-    local method = r['method']
-    if method == "GET" or method == "HEAD" then
-        rewrite_request(r)
-    end
+local method = r['method']
+if method == "GET" or method == "HEAD" then
+    rewrite_request(r)
 end
 

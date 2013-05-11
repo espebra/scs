@@ -156,71 +156,22 @@ local function delete_object(internal, bucket, object)
     return exitcode, msg
 end
 
-timer.initiate_periodic_health_checks(5)
-
-ngx.header["server"] = nil
-local h = ngx.req.get_headers()
-local internal = common.is_internal_request(h['user-agent'])
-local debug = h['x-debug']
-local status = h['x-status']
-local bucket = h['x-bucket']
+local r = common.parse_request()
+--ngx.header["server"] = nil
 
 local exitcode = nil
 local msg = nil
 
--- Return 200 immediately if the x-status header is set. This is to verify that
--- the host is up and running.
-if status and internal then
-    exitcode = ngx.HTTP_OK
-    msg = "Returning 200 to the status check."
-end
-
-if not status and not bucket then
-    exitcode = ngx.HTTP_BAD_REQUEST
-    msg = "The request is missing the x-bucket header."
-end
-
-if not status and not common.verify_bucket(bucket) then
-    exitcode = ngx.HTTP_BAD_REQUEST
-    if bucket == nil then
-        msg = "Invalid bucket name."
-    else
-        msg = "Invalid bucket name (" .. bucket .. ")."
-    end
-end
-
--- Read the object name, and remove the first char (which is a /)
-local object = string.sub(ngx.var.request_uri, 2)
-if not status and string.len(object) == 0 then
-    exitcode = ngx.HTTP_BAD_REQUEST
-    msg = "The object name is not set."
-end
-
--- Unescape the filename of the object before hashing
-object = ngx.unescape_uri(object)
-
--- Assemble the request metadata table
-local r = {
-  ['object'] = object, -- Plain text name of the object
-  ['object_base64'] = ngx.encode_base64(object), -- Base64 name of the object
-  ['method'] = ngx.var.request_method, -- Request method (HEAD, GET, POST, ..)
-  ['bucket'] = bucket, -- Name of the bucket
-  ['internal'] = internal, -- True if internal signaling request
-  ['debug'] = debug, -- Add debug information in the response
-}
-
 --exitcode, msg = route.request(r)
-if not exitcode then
-    local method = r['method']
-    if method == "POST" then
-        exitcode, msg = post_object(internal, bucket, object)
-    elseif method == "PUT" then
-        exitcode, msg = put_object(internal, bucket, object)
-    elseif method == "DELETE" then
-        exitcode, msg = delete_object(internal, bucket, object)
-    elseif method == "GET" or method == "HEAD" then
-        exitcode, msg = lookup_object(r)
-    end
+local method = r['method']
+if method == "POST" then
+    exitcode, msg = post_object(r['internal'], r['bucket'], r['object'])
+elseif method == "PUT" then
+    exitcode, msg = put_object(r['internal'], r['bucket'], r['object'])
+elseif method == "DELETE" then
+    exitcode, msg = delete_object(r['internal'], r['bucket'], r['object'])
+elseif method == "GET" or method == "HEAD" then
+    exitcode, msg = lookup_object(r)
 end
 
 local elapsed = ngx.now() - ngx.req.start_time()

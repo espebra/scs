@@ -110,7 +110,6 @@ function M.http_request(host, port, headers, method, path)
         ngx.log(ngx.ERR,"Unable to execute " .. method .. " to " .. host .. ":" .. port .. path .. ": " .. err)
         return nil
     end
-    ngx.log(ngx.ERR,"Executed with success " .. method .. " to " .. host .. ":" .. port .. path .. ": " .. res.status)
     if res.status >= 200 and res.status < 300 then
         return true
     else
@@ -449,6 +448,41 @@ function M.is_internal_request(useragent)
         end
     end
     return false
+end
+
+function M.parse_request()
+    local h = ngx.req.get_headers()
+    local internal = M.is_internal_request(h['user-agent'])
+    local debug = h['x-debug']
+    local status = h['x-status']
+    local bucket = h['x-bucket']
+
+    -- Read the object name, and remove the first char (which is a /)
+    local object = string.sub(ngx.var.request_uri, 2)
+    -- Unescape the filename of the object before hashing
+    object = ngx.unescape_uri(object)
+
+    if not M.verify_bucket(bucket) then
+        bucket = false
+    end
+
+    local r = {
+        -- Plain text name of the object
+        ['object'] = object,
+        -- Base64 name of the object
+        ['object_base64'] = ngx.encode_base64(object), 
+        -- Request method (HEAD, GET, POST, ..)
+        ['method'] = ngx.var.request_method, 
+        -- Name of the bucket
+        ['bucket'] = bucket, 
+        -- True if internal signaling request
+        ['internal'] = internal, 
+        -- Add debug information in the response
+        ['status'] = status, 
+        -- Add debug information in the response
+        ['debug'] = debug, 
+    }
+    return r
 end
 
 return M
