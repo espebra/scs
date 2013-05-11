@@ -66,7 +66,7 @@ You should now be good to go.
 
 ### Upload
 
-The following will upload the content of the file *sourcefile* to the bucket *somebucket* with the file name *targetfile*.
+The following will upload the content of the file *sourcefile* to the bucket *somebucket* with the file name *targetfile*. Targetfile may contain the character /, which will make it look like a directory structure.
 
     # curl -L -H 'expect: 100-continue' --data-binary "@sourcefile" http://somebucket.scs.company.com/targetfile
 
