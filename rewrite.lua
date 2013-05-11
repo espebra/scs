@@ -13,9 +13,9 @@ local function rewrite_request(r)
     local bucket = r['bucket']
     local object_base64 = r['object_base64']
     local internal = r['internal']
-    local dir = common.get_storage_directory() .. r['dir']
-    if common.object_exists_locally(dir, bucket, object_base64) then
-        local uri = "/" .. bucket .. "/" .. object_base64
+    local dir = common.get_storage_directory()
+    if common.is_file(dir .. "/" .. bucket .. "/" .. r['dir'] .. "/" .. object_base64) then
+        local uri = "/" .. bucket .. "/" .. r['dir'] .. "/" .. object_base64
         ngx.log(ngx.ERR,"Found " .. bucket .. "/" .. object .. " in local file system")
         ngx.log(ngx.ERR,"Rewriting URI " .. ngx.var.uri .. " to " .. uri)
         ngx.req.set_uri(uri, true)
