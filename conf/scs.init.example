@@ -1,0 +1,58 @@
+#!/bin/bash
+#
+# chkconfig: 2345 55 25
+#
+#       /etc/rc.d/init.d/
+#
+
+export PATH="$PATH:/usr/local/openresty/nginx/sbin"
+export LD_LIBRARY_PATH="/usr/local/openresty/luajit/lib/:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="/usr/local/openresty/lualib/:$LD_LIBRARY_PATH"
+
+cd /srv/scs
+
+start() {
+        echo "Starting"
+        nohup nginx -p /srv/scs/ -c /srv/scs/conf/nginx.conf &
+        return
+}
+
+stop() {
+        echo "Shutting down"
+        killall nginx
+        return
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    status)
+        pgrep nginx -u scs
+        if [ $? -eq 0 ]; then
+            exit 0
+        else
+            exit 3
+        fi
+        ;;
+    restart)
+        stop
+        sleep 1
+        start
+        ;;
+    reload)
+
+        [ -f /var/lock/subsys/ ] && restart || :
+        ;;
+    probe)
+
+        ;;
+    *)
+        echo "Usage:  {start|stop|status|reload|restart[|probe]"
+        exit 1
+        ;;
+esac
+exit $?
