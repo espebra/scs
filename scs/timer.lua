@@ -4,10 +4,10 @@ local common = require "scs.common"
 local ngx = ngx
 
 function M.initiate_periodic_health_checks(delay)
-    if ngx.shared.timers then
+    if ngx.shared.health_check_timer then
         return
     else
-        ngx.shared.timers = true
+        ngx.shared.health_check_timer = true
     end
 
     local handler
@@ -33,6 +33,38 @@ function M.initiate_periodic_health_checks(delay)
                     common.update_host_status(host,status)
                 end
             end
+        else
+            ngx.log(ngx.ERR, "Failed to create the timer: ", err)
+            return
+        end
+    end
+
+    local ok, err = ngx.timer.at(delay, handler)
+    if not ok then
+        ngx.log(ngx.ERR, "failed to create the timer: ", err)
+        return
+    end
+end
+
+function M.initiate_batch_synchronization(delay)
+    if ngx.shared.synchronization_timer then
+        return
+    else
+        ngx.shared.synchronization_timer = true
+    end
+
+    local handler
+    handler = function (premature)
+        -- do some routine job in Lua just like a cron job
+        if premature then
+            return
+        end
+        local ok, err = ngx.timer.at(delay, handler)
+        if ok then
+            ngx.log(ngx.ERR, "Execute batch synchronization now!")
+            ngx.log(ngx.ERR, "Work start")
+            ngx.sleep(300)
+            ngx.log(ngx.ERR, "Work complete")
         else
             ngx.log(ngx.ERR, "Failed to create the timer: ", err)
             return
