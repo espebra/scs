@@ -15,7 +15,7 @@ local function lookup_object(r)
     local internal = r['internal']
     local dir = common.get_storage_directory()
 
-    -- The object do not exist locally
+    -- The object does not exist locally
     if not internal then
         -- We do not have the file locally. Should lookup the hash table to
         -- find a valid host to redirect to. 302.
