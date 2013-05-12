@@ -463,7 +463,7 @@ function M.parse_request()
     }
 
     -- Clean up
-    ngx.header['server'] = nil
+    ngx.header['server'] = 'scs'
     return r
 end
 
