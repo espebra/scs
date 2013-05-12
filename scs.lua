@@ -55,7 +55,6 @@ local function post_object(r)
     local sites = common.get_object_replica_sites(bucket, object)
     local hosts = common.get_replica_hosts(bucket, object, sites)
     local exitcode = ngx.HTTP_NOT_FOUND
-    local msg = nil
 
     local dir = common.get_storage_directory()
     if common.object_fits_on_this_host(hosts) then
@@ -69,12 +68,12 @@ local function post_object(r)
         local req_body_file = ngx.req.get_body_file()
 
         if not req_body_file then
-            msg = 'No file found in request'
+            ngx.log(ngx.ERR,'No file found in request')
             exitcode = ngx.HTTP_BAD_REQUEST
         end
 
         if req_body_file == nil then
-            msg = 'Request body is nil'
+            ngx.log(ngx.ERR,'Request body is nil')
             exitcode = ngx.HTTP_BAD_REQUEST
         end
 
@@ -93,10 +92,10 @@ local function post_object(r)
         realfile:close()
 
         if common.is_file(dir .. "/" .. bucket .. "/" .. r['dir'] .. "/" .. object_base64) then
-            msg = 'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system.'
+            ngx.log(ngx.INFO,'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system.')
             exitcode = ngx.HTTP_OK
         else
-            msg = 'Failed to write object ' .. object .. ' in bucket ' .. bucket .. ' to local file system'
+            ngx.log(ngx.ERR,'Failed to write object ' .. object .. ' in bucket ' .. bucket .. ' to local file system')
             exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
         end
 
@@ -111,12 +110,12 @@ local function post_object(r)
             if common.get_host_status(host) then
                 local res = common.sync_object(dir, r['dir'], host, bucket, object_base64)
                 if res then
-                    ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " succeeded.")
+                    ngx.log(ngx.NOTICE,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " succeeded.")
                 else
                     ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " failed.")
                 end
             else
-                ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " not initiated. The host is down.")
+                ngx.log(ngx.WARN,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " not initiated. The host is down.")
             end
         end
     else
@@ -131,51 +130,46 @@ local function post_object(r)
         hosts_text = hosts_text .. " ]"
 
         if host == nil then
-            msg = 'None of the hosts for object ' .. object .. ' in bucket ' .. bucket .. ' are available at the moment ' .. hosts_text
+            ngx.log(ngx.WARN,'None of the hosts for object ' .. object .. ' in bucket ' .. bucket .. ' are available at the moment ' .. hosts_text)
             exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
         else
             -- Redirect to one of the corrent hosts here. 307.
-            --ngx.log(ngx.ERR,"Found " .. #hosts .. " available hosts, selected " .. host)
             local port = common.get_bind_port()
             local url = common.generate_url(host,port,object,bucket)
             ngx.header["Location"] = url
-            msg = 'Redirecting POST request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
+            ngx.log(ngx.INFO,'Redirecting POST request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text)
             exitcode = 307
         end
     end
-    return exitcode, msg
+    return exitcode
 end
 
 local function put_object(internal, bucket, object, req_body_file)
-    local msg
     local exitcode = ngx.HTTP_OK
     ngx.req.read_body()
     local req_body_file = ngx.req.get_body_file()
-    return exitcode, msg
+    return exitcode
 end
 
 local function delete_object(internal, bucket, object)
-    local msg
     local exitcode = ngx.HTTP_OK
-    return exitcode, msg
+    return exitcode
 end
 
 local r = common.parse_request()
 --ngx.header["server"] = nil
 
 local exitcode = nil
-local msg = nil
 
---exitcode, msg = route.request(r)
 local method = r['method']
 if method == "POST" then
-    exitcode, msg = post_object(r)
+    exitcode = post_object(r)
 elseif method == "PUT" then
-    exitcode, msg = put_object(r['internal'], r['bucket'], r['object'])
+    exitcode = put_object(r['internal'], r['bucket'], r['object'])
 elseif method == "DELETE" then
-    exitcode, msg = delete_object(r['internal'], r['bucket'], r['object'])
+    exitcode = delete_object(r['internal'], r['bucket'], r['object'])
 elseif method == "GET" or method == "HEAD" then
-    exitcode, msg = lookup_object(r)
+    exitcode = lookup_object(r)
 end
 
 local elapsed = ngx.now() - ngx.req.start_time()
@@ -185,11 +179,5 @@ if not ngx.headers_sent then
     end
 end
 
-if debug then
-    if msg then
-        ngx.log(ngx.ERR, "Req time: " .. elapsed .. " sec. " .. msg)
-    else
-        ngx.log(ngx.ERR, "Req time: " .. elapsed .. " sec. No message")
-    end
-end
 ngx.exit(exitcode)
+

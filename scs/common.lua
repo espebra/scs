@@ -48,6 +48,7 @@ function M.update_host_status(host,status)
     else
         success, err, forcible = s:set(host, false)
     end
+
     if success then
         return true
     else
@@ -58,18 +59,37 @@ end
 
 -- Verify that the bucket name is valid
 function M.verify_bucket(bucket)
+
+    -- Must not be false
     if not bucket then
         return false
     end
+
+    -- Must not be less than 3 characters
     if #bucket < 3 then
         return false
     end
-    if #bucket > 40 then
+
+    -- Must not be more than 63 characters
+    if #bucket > 63 then
         return false
     end
-    if not ngx.re.match(bucket, '^[a-zA-Z0-9-]+$','j') then
+
+    -- Must contain only allowed characters
+    if not ngx.re.match(bucket, '^[a-z0-9-]+$','j') then
         return false
     end
+
+    -- Must not start with -
+    if not ngx.re.match(bucket, '^-','j') then
+        return false
+    end
+
+    -- Must not end with -
+    if not ngx.re.match(bucket, '-$','j') then
+        return false
+    end
+
     return true
 end
 
