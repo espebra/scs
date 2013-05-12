@@ -136,48 +136,14 @@ function M.http_request(host, port, headers, method, path)
         ngx.log(ngx.ERR,"Unable to execute " .. method .. " to http://" .. host .. ":" .. port .. path .. ": " .. err)
         return nil
     end
+
+    ngx.log(ngx.INFO,"HTTP " .. method .. " request to " .. host .. ":" .. port .. path .. " returned " .. res.status)
+
     if res.status >= 200 and res.status < 300 then
         return true
     else
         return false
     end
-
-    -- local client = http:new()
-    -- client:set_timeout(1000)
-
-    -- local ok, err = client:connect(host, port)
-    -- if not ok then
-    --     ngx.log(ngx.ERR,"Failed to connect to " .. host .. ":" .. port .. ": " .. err)
-    --     return nil
-    -- end
-
-    -- local res, err = client:request({
-    --     method  = method,
-    --     path    = path,
-    --     headers = headers
-    -- })
-
-    -- if not res then
-    --     ngx.log(ngx.ERR,"Failed to retrieve " .. host .. path .. ": " .. err)
-    --     return nil
-    -- end
-
-    -- -- close connection, or put it into the connection pool
-    -- if res.headers["connection"] == "close" then
-    --     local ok, err = client:close()
-    --     if not ok then
-    --         ngx.log(ngx.ERR,"Failed to close: ", err)
-    --         return nil
-    --     end
-    -- else
-    --     client:set_keepalive(0, 100)
-    -- end
-
-    -- if res.status >= 200 and res.status < 300 then
-    --     return true
-    -- else
-    --     return false
-    -- end
 end
 
 -- Check if an object exists on a remote host
@@ -209,7 +175,7 @@ end
 function M.create_hash_map(values)
     local hash_map = Flexihash.New()
     for _,value in pairs(values) do
-        -- ngx.log(ngx.ERR,"Adding value " .. value .. " of type " .. type(value) .. " to the hash")
+        ngx.log(ngx.DEBUG,"Adding value " .. value .. " of type " .. type(value) .. " to the hash")
         hash_map:addTarget(value)
     end
     return hash_map
@@ -258,7 +224,7 @@ function M.get_configuration()
         local path = "/etc/scs/scs.json"
         json = read_file(path, true)
         c:set('conf', json)
-        ngx.log(ngx.ERR, "Caching: Configuration")
+        ngx.log(ngx.INFO, "Caching: Configuration")
     end
     local conf = cjson.decode(json)
     return conf
@@ -271,11 +237,9 @@ function M.get_site_hosts(site)
     for host,h in pairs(conf.current.hosts) do
         if h['site'] == site then
             table.insert(hosts,host)
-            -- ngx.log(ngx.ERR,"Caching: Host " .. host .. " is in site " ..  h['site'])
         end
     end
     
-    -- ngx.log(ngx.ERR,"Returned " .. #hosts .. " hosts in site " .. site)
     return hosts
 end
 
@@ -288,7 +252,7 @@ function M.get_all_sites()
         for host,h in pairs(conf.current.hosts) do
             if not M.inTable(sites, h['site']) then
                 table.insert(sites,h['site'])
-                ngx.log(ngx.ERR,"Caching: Site " .. h['site'] .. " is one of our sites")
+                ngx.log(ngx.INFO,"Caching: Site " .. h['site'] .. " is one of our sites")
             end
         end
         ngx.shared.sites = sites
@@ -311,7 +275,6 @@ function M.look_up_hash_map(hash, hash_map, replicas)
 end
 
 function M.sync_object(dir, depth, host, bucket, object_base64)
-    --local cmd="/usr/bin/rsync -zSut " .. dir .. "/" .. bucket .. "/" .. object_base64 .. " rsync://" .. host .. "/scs/" .. bucket .. "/" .. object_base64
     local cmd="cd " .. dir .. " && /usr/bin/rsync -RzSut " .. bucket .. "/" .. depth .. "/" .. object_base64 .. " rsync://" .. host .. "/scs"
     local res = os.execute(cmd)
     if res == 0 then
@@ -324,15 +287,11 @@ end
 -- Return a table with the hosts at a specific site  where a given object fits
 -- according to the hash ring.
 function M.get_replica_site_hosts(bucket, object, site)
-    -- Try to read the hash map from shared memory
-    --local hash_map = ngx.shared[site]
-    local hash_map = false
-    if not hash_map then
-        -- If the hash map does not exist, create it and store it for later use
-        local hosts = M.get_site_hosts(site)
-        hash_map = M.create_hash_map(hosts)
-        --ngx.shared[site] = hash_map
-    end
+    -- TODO: Should store the hash map in memory to avoid having to create it 
+    -- for each request.
+    local hosts = M.get_site_hosts(site)
+    local hash_map = M.create_hash_map(hosts)
+
     -- Now we have a hash map, either created or read from memory. Use it to
     -- figure out which hosts to use for this object.
     local hash = bucket .. object
@@ -357,15 +316,11 @@ end
 -- Return a table with the sites where a given object fits according to the
 -- hash ring.
 function M.get_object_replica_sites(bucket, object)
-    -- Try to read the hash map from shared memory
-    -- local hash_map = ngx.shared.sites_hash_map
-    local hash_map = false
-    if not hash_map then
-        -- If the hash map does not exist, create it and store it for later use
-        local sites = M.get_all_sites()
-        hash_map = M.create_hash_map(sites)
-        -- ngx.shared.sites_hash_map = hash_map
-    end
+    -- TODO: Should store the hash map in memory to avoid having to create it 
+    -- for each request.
+    local sites = M.get_all_sites()
+    local hash_map = M.create_hash_map(sites)
+
     -- Now we have a hash map, either created or read from memory. Use it to
     -- figure out which sites to use for this object.
     local hash = bucket .. object
@@ -400,7 +355,6 @@ end
 -- ring lookup,
 function M.get_host_with_object(hosts, bucket, object)
     -- Randomize the hosts table
-    -- backwards
     hosts = M.randomize_table(hosts)
 
     -- Return nil if no hosts are up
@@ -434,40 +388,7 @@ function M.get_host_with_object(hosts, bucket, object)
     return status
 end
 
--- function M.get_available_replica_hosts(hosts)
---     -- Randomize the hosts table
---     -- backwards
---     for i = #hosts, 2, -1 do
---         -- select a random number between 1 and i
---         local r = math.random(i)
---          -- swap the randomly selected item to position i
---         hosts[i], hosts[r] = hosts[r], hosts[i]
---     end
--- 
---     -- For each host, check if the object is available. Return the first
---     -- host that has the object available.
---     local port = M.get_bind_port()
---     local available_hosts = {}
---     local threads = {}
---     for i,host in pairs(hosts) do
---         if M.get_host_status(host) then
---             table.insert(threads,ngx.thread.spawn(M.remote_host_availability, host, port))
---         end
---     end
--- 
---     for i = 1, #threads do
---         local ok, res = ngx.thread.wait(threads[i])
---         if ok then
---             if res then
---                 table.insert(available_hosts, hosts[i])
---             end
---         end
---     end
--- 
---     -- If any of the hosts are available, return nil
---     return available_hosts
--- end
-
+-- Check if the request matches one of the hosts in the given table
 function M.object_fits_on_this_host(hosts)
     for _,host in pairs(hosts) do
         if ngx.req.get_headers()["Host"] == host then
@@ -477,6 +398,7 @@ function M.object_fits_on_this_host(hosts)
     return false
 end
 
+-- Check whether the request is an internal scs request (true) or not (false)
 function M.is_internal_request(useragent)
     if useragent then
         if useragent == "scs internal" then
@@ -486,6 +408,7 @@ function M.is_internal_request(useragent)
     return false
 end
 
+-- Populate the request table with sanitized input data
 function M.parse_request()
     local h = ngx.req.get_headers()
     local internal = M.is_internal_request(h['user-agent'])
@@ -510,26 +433,28 @@ function M.parse_request()
 
     -- Read the object name, and remove the first char (which is a /)
     local object = string.sub(ngx.var.uri, 2)
+
     -- Unescape the filename of the object before hashing
     object = ngx.unescape_uri(object)
+    local object_base64 = ngx.encode_base64(object)
 
+    -- Make sure that the bucket name is valid
     if not M.verify_bucket(bucket) then
         bucket = false
     end
 
-    local object_base64 = ngx.encode_base64(object)
     local r = {
         -- Plain text name of the object
         ['object'] = object,
         -- Base64 name of the object
         ['object_base64'] = object_base64,
-        -- Dir
+        -- Relative d/i/r/ectory to use in the file system
         ['dir'] = M.get_directory_depth(object_base64),
         -- Request method (HEAD, GET, POST, ..)
         ['method'] = ngx.var.request_method, 
         -- Name of the bucket
         ['bucket'] = bucket, 
-        -- True if internal signaling request
+        -- True if the request is an internal scs request
         ['internal'] = internal, 
         -- Add debug information in the response
         ['status'] = status, 
