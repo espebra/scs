@@ -11,7 +11,7 @@ local function bucket_index(bucket)
     -- See if the object exists locally
     -- local bucket = r['bucket']
 
-    local objects = common.scandir(bucket)
+    local objects = common.scandir(bucket, 1000)
     if objects then
         local json = cjson.encode(objects)
         if json then

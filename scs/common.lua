@@ -480,7 +480,7 @@ end
 
 -- Given a directory, return a table with information about each file in that
 -- directory - recusively and sorted by mtime.
-function M.scandir(bucket)
+function M.scandir(bucket, max_objects)
     -- If the directory does not exist, return an empty table here
     local dir = M.get_storage_directory()
     local path = dir
@@ -514,8 +514,12 @@ function M.scandir(bucket)
                     -- t[i] = n
                     counter = counter + 1
                     table.insert(objects, n)
-                    if counter >= 1000 then
-                        break
+
+                    -- Abort here if max_objects is set and the counter is equal (or larger)
+                    if max_objects then
+                        if counter >= max_objects then
+                            break
+                        end
                     end
                 end
             end
