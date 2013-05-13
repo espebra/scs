@@ -331,10 +331,12 @@ end
 
 function M.get_directory_depth(object_base64)
     local dir = false
-    local m, err = ngx.re.match(object_base64, "^(.)(.)(.)",'j')
-    if m then
-        if #m == 3 then
-            dir = m[1] .. "/" .. m[2] .. "/" .. m[3]
+    if object_base64 then
+        local m, err = ngx.re.match(object_base64, "^(.)(.)(.)",'j')
+        if m then
+            if #m == 3 then
+                dir = m[1] .. "/" .. m[2] .. "/" .. m[3]
+            end
         end
     end
     return dir 
@@ -436,7 +438,16 @@ function M.parse_request()
 
     -- Unescape the filename of the object before hashing
     object = ngx.unescape_uri(object)
-    local object_base64 = ngx.encode_base64(object)
+
+    -- Set both the object and object_base64 to nil if the length of the object
+    -- name is 0.
+    local object_base64
+    if #object == 0 then
+        object = nil
+        object_base64 = nil
+    else
+        object_base64 = ngx.encode_base64(object)
+    end
 
     -- Make sure that the bucket name is valid
     if not M.verify_bucket(bucket) then
@@ -465,6 +476,53 @@ function M.parse_request()
     -- Clean up
     ngx.header['server'] = 'scs'
     return r
+end
+
+-- Given a directory, return a table with information about each file in that
+-- directory - recusively and sorted by mtime.
+function M.scandir(bucket)
+    -- If the directory does not exist, return an empty table here
+    local dir = M.get_storage_directory()
+    local path = dir
+
+    if bucket then
+        path = dir .. "/" .. bucket
+    end
+
+    if not M.is_file(path) then
+        return {}
+    end
+
+    local i, t, popen = 0, {}, io.popen
+    -- for filename in popen('ls "'..directory..'"'):lines() do
+    local counter = 0
+    for entry in popen('find ' .. path .. ' -type f -printf "%T@\t%s\t%f\t%h\n" | sort -nr'):lines() do
+        local n = {}
+        local m, err = ngx.re.match(entry, "^([^\t]+)\t([^\t]+)\t([^\t]+)\t" .. dir .. "/([^/]+).*$","j")
+        if m then
+            if #m == 4 then
+                n['mtime'] = m[1]
+                n['size'] = m[2]
+                n['object'] = ngx.decode_base64(m[3])
+                if bucket then
+                    n['bucket'] = bucket
+                else
+                    n['bucket'] = m[4]
+                end
+
+                if n['mtime'] and M.verify_bucket(n['bucket']) then
+                    i = i + 1
+                    t[i] = n
+                    counter = counter + 1
+                    if counter >= 1000 then
+                        break
+                    end
+                end
+            end
+        end
+    end
+    -- gx.log(ngx.ERR,"Found " .. #t .. " objects.")
+    return t
 end
 
 return M

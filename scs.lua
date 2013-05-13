@@ -5,6 +5,23 @@ local timer = require "scs.timer"
 --local Flexihash = require 'libs.Flexihash'
 local cjson = require 'cjson'
 
+local function bucket_index(r)
+    local exitcode = ngx.HTTP_NOT_FOUND
+    local msg
+    -- See if the object exists locally
+    local bucket = r['bucket']
+
+    local objects = common.scandir(bucket)
+    if objects then
+        local json = cjson.encode(objects)
+        if json then
+            ngx.print(json)
+            exitcode = ngx.HTTP_OK
+        end
+    end
+    return exitcode
+end
+
 local function lookup_object(r)
     local exitcode = ngx.HTTP_NOT_FOUND
     local msg
@@ -15,7 +32,7 @@ local function lookup_object(r)
     local internal = r['internal']
     local dir = common.get_storage_directory()
 
-    -- The object does not exist locally
+    -- The object do not exist locally
     if not internal then
         -- We do not have the file locally. Should lookup the hash table to
         -- find a valid host to redirect to. 302.
@@ -169,7 +186,11 @@ elseif method == "PUT" then
 elseif method == "DELETE" then
     exitcode = delete_object(r['internal'], r['bucket'], r['object'])
 elseif method == "GET" or method == "HEAD" then
-    exitcode = lookup_object(r)
+    if r['object'] == nil then
+        exitcode = bucket_index(r['bucket'])
+    else
+        exitcode = lookup_object(r)
+    end
 end
 
 local elapsed = ngx.now() - ngx.req.start_time()

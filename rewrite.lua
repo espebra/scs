@@ -29,7 +29,10 @@ if r['status'] and r['internal'] then
 end
 
 local method = r['method']
-if method == "GET" or method == "HEAD" then
-    rewrite_request(r)
+if method == "GET" or method == "HEAD"then
+    -- Only if a object name is set
+    if r['object'] then
+        rewrite_request(r)
+    end
 end
 
