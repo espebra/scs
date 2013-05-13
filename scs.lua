@@ -5,11 +5,11 @@ local timer = require "scs.timer"
 --local Flexihash = require 'libs.Flexihash'
 local cjson = require 'cjson'
 
-local function bucket_index(r)
+local function bucket_index(bucket)
     local exitcode = ngx.HTTP_NOT_FOUND
     local msg
     -- See if the object exists locally
-    local bucket = r['bucket']
+    -- local bucket = r['bucket']
 
     local objects = common.scandir(bucket)
     if objects then
@@ -186,10 +186,12 @@ elseif method == "PUT" then
 elseif method == "DELETE" then
     exitcode = delete_object(r['internal'], r['bucket'], r['object'])
 elseif method == "GET" or method == "HEAD" then
-    if r['object'] == nil then
-        exitcode = bucket_index(r['bucket'])
-    else
-        exitcode = lookup_object(r)
+    if r['bucket'] then
+        if r['object'] == nil then
+            exitcode = bucket_index(r['bucket'])
+        else
+            exitcode = lookup_object(r)
+        end
     end
 end
 

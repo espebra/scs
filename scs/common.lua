@@ -493,8 +493,7 @@ function M.scandir(bucket)
         return {}
     end
 
-    local i, t, popen = 0, {}, io.popen
-    -- for filename in popen('ls "'..directory..'"'):lines() do
+    local entry, objects, popen = nil, {}, io.popen
     local counter = 0
     for entry in popen('find ' .. path .. ' -type f -printf "%T@\t%s\t%f\t%h\n" | sort -nr'):lines() do
         local n = {}
@@ -511,9 +510,10 @@ function M.scandir(bucket)
                 end
 
                 if n['mtime'] and M.verify_bucket(n['bucket']) then
-                    i = i + 1
-                    t[i] = n
+                    -- i = i + 1
+                    -- t[i] = n
                     counter = counter + 1
+                    table.insert(objects, n)
                     if counter >= 1000 then
                         break
                     end
@@ -521,8 +521,8 @@ function M.scandir(bucket)
             end
         end
     end
-    -- gx.log(ngx.ERR,"Found " .. #t .. " objects.")
-    return t
+    ngx.log(ngx.INFO,"Scanned the directory " .. path .. " and found " .. #objects .. " .. objects.")
+    return objects
 end
 
 return M
