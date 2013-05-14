@@ -515,13 +515,7 @@ function M.scandir(bucket)
                 n['size'] = m[2]
                 local object = ngx.decode_base64(m[3])
 
-                if bucket then
-                    n['bucket'] = bucket
-                else
-                    n['bucket'] = m[4]
-                end
-
-                if n['mtime'] and M.verify_bucket(n['bucket']) then
+                if n['mtime'] and bucket == m[4] then
                     objects[object] = n
                 end
             end
