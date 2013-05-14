@@ -11,35 +11,68 @@ local function bucket_index(r)
     local internal = r['internal']
     local bucket = r['bucket']
 
+    local max_keys = r['max-keys']
+    if not max_keys then
+        max_keys = 1000
+    end
+    local prefix = r['prefix']
+    local marker = r['marker']
+
     if internal then
         -- Return a table with the objects on this host
-        local objects = common.scandir(bucket, 1000)
+        local objects = common.scandir(bucket)
         if objects then
-            local json = cjson.encode(objects)
-            if json then
-                ngx.print(json)
-                exitcode = ngx.HTTP_OK
-            end
+            ngx.log(ngx.ERR,"Found " .. #objects .. " in the internal request")
         end
-        return exitcode
+
+        local json = cjson.encode(objects)
+        if json then
+            ngx.print(json)
+            exitcode = ngx.HTTP_OK
+        end
     else
         -- Query the replica hosts for a table of objects
         local conf = common.get_configuration()
         local method = "GET"
-        local path = "/"
+        local path = "/?bucket=" .. bucket .. "&max-keys=" .. max_keys
         local headers = {}
         headers['user-agent'] = "scs internal"
 
+        local objects = {}
         for host,h in pairs(conf.current.hosts) do
-            local port = common.get_bind_port()
-            local status, body = common.http_request(host, port, headers, method, path)
-            if status then
-                ngx.log(ngx.INFO,"Object list retrieved successfully from " .. host)
-            else
-                ngx.log(ngx.WARN,"Failed to retrieve the object list from " .. host)
+            if common.get_host_status(host) then
+                local port = common.get_bind_port()
+                local status, body = common.http_request(host, port, headers, method, path)
+                if status then
+                    ngx.log(ngx.INFO,"Object list retrieved successfully from " .. host)
+                    local o = cjson.decode(body)
+                    if o then
+                        table.insert(objects,o)
+                    end
+                else
+                    ngx.log(ngx.WARN,"Failed to retrieve the object list from " .. host)
+                end
             end
         end
-        
+
+        local res = {}
+        res['bucket'] = bucket
+        if prefix then
+            res['prefix'] = prefix
+        end
+        if marker then
+            res['marker'] = marker
+        end
+        res['contents'] = objects
+
+        -- for i,o in pairs(objects) do
+        -- end
+
+        local json = cjson.encode(res)
+        if json then
+            ngx.print(json)
+            exitcode = ngx.HTTP_OK
+        end
     end
     return exitcode
 end

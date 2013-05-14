@@ -113,6 +113,14 @@ function M.get_header(header,headers)
     return nil
 end
 
+-- Return the value of a given request parameter, or nil if the parameter is not set
+function M.get_parameter(parameter,parameters)
+    if parameters[parameter] then
+        return parameters[parameter]
+    end
+    return nil
+end
+
 -- Check if a path is a file in the local file system
 function M.is_file(path)
    local f=io.open(path,"r")
@@ -471,6 +479,9 @@ function M.parse_request()
         ['status'] = status, 
         -- Add debug information in the response
         ['debug'] = debug, 
+        ['prefix'] = M.get_parameter('prefix',args), 
+        ['max-keys'] = M.get_parameter('max-keys',args), 
+        ['marker'] = M.get_parameter('marker',args), 
     }
 
     -- Clean up
@@ -480,7 +491,7 @@ end
 
 -- Given a directory, return a table with information about each file in that
 -- directory - recusively and sorted by mtime.
-function M.scandir(bucket, max_objects)
+function M.scandir(bucket)
     -- If the directory does not exist, return an empty table here
     local dir = M.get_storage_directory()
     local path = dir
@@ -495,14 +506,15 @@ function M.scandir(bucket, max_objects)
 
     local entry, objects, popen = nil, {}, io.popen
     local counter = 0
-    for entry in popen('find ' .. path .. ' -type f -printf "%T@\t%s\t%f\t%h\n" | sort -nr | head -n ' .. max_objects):lines() do
-        local n = {}
+    for entry in popen('find ' .. path .. ' -type f -printf "%T@\t%s\t%f\t%h\n" | sort -nr'):lines() do
         local m, err = ngx.re.match(entry, "^([^\t]+)\t([^\t]+)\t([^\t]+)\t" .. dir .. "/([^/]+).*$","j")
         if m then
             if #m == 4 then
+                local n = {}
                 n['mtime'] = m[1]
                 n['size'] = m[2]
-                n['object'] = ngx.decode_base64(m[3])
+                local object = ngx.decode_base64(m[3])
+
                 if bucket then
                     n['bucket'] = bucket
                 else
@@ -510,22 +522,12 @@ function M.scandir(bucket, max_objects)
                 end
 
                 if n['mtime'] and M.verify_bucket(n['bucket']) then
-                    -- i = i + 1
-                    -- t[i] = n
-                    counter = counter + 1
-                    table.insert(objects, n)
-
-                    -- Abort here if max_objects is set and the counter is equal (or larger)
-                    -- if max_objects then
-                    --     if counter >= max_objects then
-                    --         break
-                    --     end
-                    -- end
+                    objects[object] = n
                 end
             end
         end
     end
-    ngx.log(ngx.INFO,"Scanned the directory " .. path .. " and found " .. #objects .. " .. objects.")
+    --ngx.log(ngx.ERR,"Scanned the directory " .. path .. " and found " .. #objects .. " objects.")
     return objects
 end
 
