@@ -140,9 +140,9 @@ function M.http_request(host, port, headers, method, path)
     ngx.log(ngx.INFO,"HTTP " .. method .. " request to " .. host .. ":" .. port .. path .. " returned " .. res.status)
 
     if res.status >= 200 and res.status < 300 then
-        return true
+        return true, res.body
     else
-        return false
+        return false, nil
     end
 end
 

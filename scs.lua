@@ -5,19 +5,41 @@ local timer = require "scs.timer"
 --local Flexihash = require 'libs.Flexihash'
 local cjson = require 'cjson'
 
-local function bucket_index(bucket)
+local function bucket_index(r)
     local exitcode = ngx.HTTP_NOT_FOUND
     local msg
-    -- See if the object exists locally
-    -- local bucket = r['bucket']
+    local internal = r['internal']
+    local bucket = r['bucket']
 
-    local objects = common.scandir(bucket, 1000)
-    if objects then
-        local json = cjson.encode(objects)
-        if json then
-            ngx.print(json)
-            exitcode = ngx.HTTP_OK
+    if internal then
+        -- Return a table with the objects on this host
+        local objects = common.scandir(bucket, 1000)
+        if objects then
+            local json = cjson.encode(objects)
+            if json then
+                ngx.print(json)
+                exitcode = ngx.HTTP_OK
+            end
         end
+        return exitcode
+    else
+        -- Query the replica hosts for a table of objects
+        local conf = common.get_configuration()
+        local method = "GET"
+        local path = "/"
+        local headers = {}
+        headers['user-agent'] = "scs internal"
+
+        for host,h in pairs(conf.current.hosts) do
+            local port = common.get_bind_port()
+            local status, body = common.http_request(host, port, headers, method, path)
+            if status then
+                ngx.log(ngx.INFO,"Object list retrieved successfully from " .. host)
+            else
+                ngx.log(ngx.WARN,"Failed to retrieve the object list from " .. host)
+            end
+        end
+        
     end
     return exitcode
 end
@@ -187,11 +209,7 @@ elseif method == "DELETE" then
     exitcode = delete_object(r['internal'], r['bucket'], r['object'])
 elseif method == "GET" or method == "HEAD" then
     if r['bucket'] then
-        if r['object'] == nil then
-            exitcode = bucket_index(r['bucket'])
-        else
-            exitcode = lookup_object(r)
-        end
+        exitcode = bucket_index(r)
     end
 end
 
