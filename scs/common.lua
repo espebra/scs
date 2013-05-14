@@ -495,7 +495,7 @@ function M.scandir(bucket, max_objects)
 
     local entry, objects, popen = nil, {}, io.popen
     local counter = 0
-    for entry in popen('find ' .. path .. ' -type f -printf "%T@\t%s\t%f\t%h\n" | sort -nr'):lines() do
+    for entry in popen('find ' .. path .. ' -type f -printf "%T@\t%s\t%f\t%h\n" | sort -nr | head -n ' .. max_objects):lines() do
         local n = {}
         local m, err = ngx.re.match(entry, "^([^\t]+)\t([^\t]+)\t([^\t]+)\t" .. dir .. "/([^/]+).*$","j")
         if m then
@@ -516,11 +516,11 @@ function M.scandir(bucket, max_objects)
                     table.insert(objects, n)
 
                     -- Abort here if max_objects is set and the counter is equal (or larger)
-                    if max_objects then
-                        if counter >= max_objects then
-                            break
-                        end
-                    end
+                    -- if max_objects then
+                    --     if counter >= max_objects then
+                    --         break
+                    --     end
+                    -- end
                 end
             end
         end
