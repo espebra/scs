@@ -507,11 +507,11 @@ function M.scandir(bucket)
     local entry, objects, popen = nil, {}, io.popen
     local counter = 0
     for entry in popen('find ' .. path .. ' -type f -printf "%T@\t%s\t%f\t%h\n" | sort -nr'):lines() do
-        local m, err = ngx.re.match(entry, "^([^\t]+)\t([^\t]+)\t([^\t]+)\t" .. dir .. "/([^/]+).*$","j")
+        local m, err = ngx.re.match(entry, "^([0-9]+)[^\t]+\t([^\t]+)\t([^\t]+)\t" .. dir .. "/([^/]+).*$","j")
         if m then
             if #m == 4 then
                 local n = {}
-                n['mtime'] = m[1]
+                n['mtime'] = ngx.http_time(m[1])
                 n['size'] = m[2]
                 local object = ngx.decode_base64(m[3])
 
