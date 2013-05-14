@@ -132,12 +132,12 @@ function M.is_file(path)
     end
 end
 
-function M.http_request(host, port, headers, method, path)
+function M.http_request(host, port, headers, method, path, timeout)
     local res, err = http.request(host, port, {
         method  = method,
         version = 0,
         path    = path,
-        timeout = 1000,
+        timeout = timeout,
         headers = headers
     })
     if not res then
@@ -159,9 +159,10 @@ function M.object_exists_on_remote_host(host, port, bucket, object)
     local method = "HEAD"
     local path = "/" .. object .. "?bucket=" .. bucket
     local headers = {}
+    local timeout = 1000
     headers['user-agent'] = "scs internal"
 
-    local res = M.http_request(host, port, headers, method, path)
+    local res = M.http_request(host, port, headers, method, path, timeout)
     if res then
         return host
     else
@@ -173,10 +174,11 @@ function M.remote_host_availability(host, port)
     local method = "HEAD"
     local path = "/"
     local headers = {}
+    local timeout = 500
     headers['x-status'] = true
     headers['user-agent'] = "scs internal"
 
-    return M.http_request(host, port, headers, method, path)
+    return M.http_request(host, port, headers, method, path, timeout)
 end
 
 -- Create a consistent hash of the values given in a table
@@ -511,7 +513,8 @@ function M.scandir(bucket)
         if m then
             if #m == 4 then
                 local n = {}
-                n['mtime'] = ngx.http_time(m[1])
+                n['mtime'] = m[1]
+                n['LastModified'] = ngx.http_time(m[1])
                 n['size'] = m[2]
                 local object = ngx.decode_base64(m[3])
 
