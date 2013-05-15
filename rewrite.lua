@@ -12,7 +12,7 @@ local function rewrite_request(r)
     local versions = common.get_local_object_versions(bucket, object)
     if #versions > 0 then
         -- Print the checksum as a response header
-        ngx.header['x-md5'] = version[1].md5
+        ngx.header['x-md5'] = versions[1].md5
 
         local uri = "/" .. bucket .. "/" .. r['dir'] .. "/" .. object_base64 .. "/" .. versions[1].version .. "-" .. versions[1].md5 .. ".data"
         ngx.log(ngx.INFO,"Found " .. bucket .. "/" .. object .. " in local file system. Rewriting URI " .. ngx.var.uri .. " to " .. uri)
