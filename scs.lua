@@ -253,8 +253,10 @@ elseif method == "PUT" then
 elseif method == "DELETE" then
     exitcode = delete_object(r['internal'], r['bucket'], r['object'])
 elseif method == "GET" or method == "HEAD" then
-    if r['bucket'] then
+    if r['bucket'] and not r['object'] then
         exitcode = bucket_index(r)
+    elseif r['bucket'] and r['object'] then
+        exitcode = lookup_object(r)
     end
 end
 
@@ -263,6 +265,10 @@ if not ngx.headers_sent then
     if elapsed > 0 then
         ngx.header["x-elapsed"] = elapsed
     end
+end
+
+if not exitcode then
+   exitcode = 500
 end
 
 ngx.exit(exitcode)
