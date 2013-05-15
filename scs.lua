@@ -139,7 +139,7 @@ local function post_object(r)
     local bucket = r['bucket']
     local object = r['object']
     local object_base64 = r['object_base64']
-    local object_name_on_disk = ngx.time() .. ".data"
+    local object_name_on_disk = ngx.time() .. "-" . r['object_md5'] .. ".data"
 
     local sites = common.get_object_replica_sites(bucket, object)
     local hosts = common.get_replica_hosts(bucket, object, sites)
