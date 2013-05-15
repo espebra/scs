@@ -51,8 +51,11 @@ local function bucket_index(r)
                         for host_object,v in pairs(host_objects) do
                             if not objects[host_object] then
                                 v['replicas'] = 1
+                                v['replica_hosts'] = {}
+                                table.insert(v['replica_hosts'],host)
                                 objects[host_object] = v
                             else
+                                table.insert(objects[host_object]['replica_hosts'],host)
                                 objects[host_object]['replicas'] = objects[host_object]['replicas'] + 1
                                 if objects[host_object]['mtime'] < v['mtime'] then
                                     objects[host_object]['mtime'] = v['mtime']
