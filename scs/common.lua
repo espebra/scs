@@ -513,9 +513,9 @@ function M.scandir(bucket)
         if m then
             if #m == 4 then
                 local n = {}
-                n['mtime'] = m[1]
+                n['mtime'] = tonumber(m[1])
                 n['LastModified'] = ngx.http_time(m[1])
-                n['size'] = m[2]
+                n['size'] = tonumber(m[2])
                 local object = ngx.decode_base64(m[3])
 
                 if n['mtime'] and bucket == m[4] then
