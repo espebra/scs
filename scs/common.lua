@@ -100,10 +100,10 @@ function M.verify_bucket(bucket)
 end
 
 -- Check if an object exists in the local file system
-function M.object_exists_locally(dir, bucket, object_base64)
-   local path = dir .. "/" ..  bucket .. "/" .. object_base64
-   return M.is_file(path)
-end
+-- function M.object_exists_locally(dir, bucket, object_base64)
+--    local path = dir .. "/" ..  bucket .. "/" .. object_base64
+--    return M.is_file(path)
+-- end
 
 -- Return the value of a given request header, or nil if the header is not set
 function M.get_header(header,headers)
@@ -284,8 +284,12 @@ function M.look_up_hash_map(hash, hash_map, replicas)
     return result
 end
 
-function M.sync_object(dir, depth, host, bucket, object_base64)
-    local cmd="cd " .. dir .. " && /usr/bin/rsync -RzSut " .. bucket .. "/" .. depth .. "/" .. object_base64 .. " rsync://" .. host .. "/scs"
+function M.sync_object(host, bucket, object)
+    local dir = M.get_storage_directory()
+    local object_base64 = ngx.encode_base64(object)
+    local depth = M.get_directory_depth(object)
+    
+    local cmd="cd " .. dir .. " && /usr/bin/rsync -RrzSut " .. bucket .. "/" .. depth .. "/" .. object_base64 .. " rsync://" .. host .. "/scs"
     local res = os.execute(cmd)
     if res == 0 then
         return true
@@ -339,12 +343,13 @@ function M.get_object_replica_sites(bucket, object)
     return result
 end
 
-function M.get_directory_depth(object_base64)
+function M.get_directory_depth(object)
+    local md5 = ngx.md5(object)
     local dir = false
-    if object_base64 then
-        local m, err = ngx.re.match(object_base64, "^(..)(..)",'j')
+    if md5 then
+        local m, err = ngx.re.match(md5, "^(..)(..)",'j')
         if m then
-            if #m == 3 then
+            if #m == 2 then
                 dir = m[1] .. "/" .. m[2]
             end
         end
@@ -471,7 +476,7 @@ function M.parse_request()
         -- Base64 name of the object
         ['object_base64'] = object_base64,
         -- Relative d/i/r/ectory to use in the file system
-        ['dir'] = M.get_directory_depth(object_name_md5),
+        ['dir'] = M.get_directory_depth(object),
         -- Request method (HEAD, GET, POST, ..)
         ['method'] = ngx.var.request_method, 
         -- Name of the bucket
@@ -529,4 +534,65 @@ end
 --     return objects
 -- end
 
+function M.replicate_object(hosts, bucket, object)
+    -- Replicate the object to other hosts here.
+    local status = false
+    local count = 0
+    for _,host in pairs(hosts) do
+        if M.get_host_status(host) then
+            local res = M.sync_object(host, bucket, object)
+            if res then
+                ngx.log(ngx.NOTICE,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " succeeded.")
+                count = count + 1
+            else
+                ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " failed.")
+            end
+        else
+            ngx.log(ngx.WARN,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " not initiated. The host is down.")
+        end
+    end
+    if count > (#hosts/2) then
+        status = true
+        ngx.log("Successfully replicated to " .. count .. " hosts. That is more than " .. #hosts/2)
+    else
+        status = false
+        ngx.log("Successfully replicated to " .. count .. " hosts. That is less than " .. #hosts/2)
+    end
+    return status
+end
+
+function M.get_local_object_path(bucket, object)
+    local dir = M.get_storage_directory()
+    local path = nil
+
+    if dir then
+        local object_base64 = ngx.encode_base64(object)
+        local depth = M.get_directory_depth(object)
+        if object_base64 and depth then
+             path = dir .. "/" .. bucket .. "/" .. depth .. "/" .. object_base64
+        end
+    end
+    return path
+end
+
+function M.get_local_object_versions(bucket, object)
+    local path = M.get_local_object_path(bucket, object)
+    local versions = {}
+
+    local entry, versions, popen = nil, {}, io.popen
+    for entry in popen('find ' .. path .. ' -type f -printf "%T@\t%s\t%f\n"'):lines() do
+        local m, err = ngx.re.match(entry, "^([0-9]+)[^\t]+\t([^\t]+)\t(.+).data$","j")
+        if m then
+            if #m == 3 then
+                local n = {}
+                n['mtime'] = tonumber(m[1])
+                n['size'] = tonumber(m[2])
+                local version = m[3]
+                versions[version] = n
+            end
+        end
+    end
+    return versions
+end
+    
 return M

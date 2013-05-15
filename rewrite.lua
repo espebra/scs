@@ -9,8 +9,9 @@ local function rewrite_request(r)
     local dir = common.get_storage_directory()
 
     -- See if the object exists locally, and rewrite if it does
-    if common.is_file(dir .. "/" .. bucket .. "/" .. r['dir'] .. "/" .. object_base64) then
-        local uri = "/" .. bucket .. "/" .. r['dir'] .. "/" .. object_base64
+    local versions = common.get_local_object_versions(bucket, object)
+    if versions then
+        local uri = "/" .. bucket .. "/" .. r['dir'] .. "/" .. object_base64 .. "/" .. versions[1] .. ".data"
         ngx.log(ngx.INFO,"Found " .. bucket .. "/" .. object .. " in local file system. Rewriting URI " .. ngx.var.uri .. " to " .. uri)
         ngx.req.set_uri(uri, true)
     end

@@ -138,15 +138,16 @@ local function post_object(r)
     local internal = r['internal']
     local bucket = r['bucket']
     local object = r['object']
+    local object_base64 = r['object_base64']
+    local object_name_on_disk = ngx.time() .. ".data"
 
     local sites = common.get_object_replica_sites(bucket, object)
     local hosts = common.get_replica_hosts(bucket, object, sites)
-    local exitcode = ngx.HTTP_NOT_FOUND
+    local exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
 
     local dir = common.get_storage_directory()
     if common.object_fits_on_this_host(hosts) then
-        local object_base64 = ngx.encode_base64(object)
-        local path = dir .. "/" .. bucket .. "/" .. r['dir']
+        local path = common.get_local_object_path(bucket, object)
         if not os.rename(path, path) then
             os.execute('mkdir -p ' .. path)
         end
@@ -165,7 +166,7 @@ local function post_object(r)
         end
 
         tmpfile = io.open(req_body_file)
-        realfile = io.open(path .. "/" .. object_base64, 'w')
+        realfile = io.open(path .. "/" .. object_name_on_disk, 'w')
 
         local size = 2^20      -- good buffer size (1M)
         while true do
@@ -178,31 +179,13 @@ local function post_object(r)
         tmpfile:close()
         realfile:close()
 
-        if common.is_file(dir .. "/" .. bucket .. "/" .. r['dir'] .. "/" .. object_base64) then
-            ngx.log(ngx.INFO,'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system.')
-            exitcode = ngx.HTTP_OK
+        if not common.is_file(path .. "/" .. object_name_on_disk) then
+            ngx.log(ngx.ERR,'Failed to write object ' .. object .. ' in bucket ' .. bucket .. ' to local file system (' .. path .. '/' .. object_name_on_disk .. ')')
         else
-            ngx.log(ngx.ERR,'Failed to write object ' .. object .. ' in bucket ' .. bucket .. ' to local file system')
-            exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
-        end
+            ngx.log(ngx.INFO,'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system (' .. path .. '/' .. object_name_on_disk .. ')')
 
-        -- Finish the request here if the configuration is set to write back.
-        local write_back = common.get_write_back()
-        if write_back then
-            ngx.eof()
-        end
-
-        -- Replicate the object to other hosts here.
-        for _,host in pairs(hosts) do
-            if common.get_host_status(host) then
-                local res = common.sync_object(dir, r['dir'], host, bucket, object_base64)
-                if res then
-                    ngx.log(ngx.NOTICE,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " succeeded.")
-                else
-                    ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " failed.")
-                end
-            else
-                ngx.log(ngx.WARN,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " not initiated. The host is down.")
+            if common.replicate_object(hosts, bucket, object) then
+                exitcode = ngx.HTTP_OK
             end
         end
     else
