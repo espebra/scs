@@ -342,7 +342,7 @@ end
 function M.get_directory_depth(object_base64)
     local dir = false
     if object_base64 then
-        local m, err = ngx.re.match(object_base64, "^(.)(.)(.)",'j')
+        local m, err = ngx.re.match(object_base64, "^(..)(..)(..)",'j')
         if m then
             if #m == 3 then
                 dir = m[1] .. "/" .. m[2] .. "/" .. m[3]
@@ -451,12 +451,11 @@ function M.parse_request()
 
     -- Set both the object and object_base64 to nil if the length of the object
     -- name is 0.
-    local object_base64
-    if #object == 0 then
-        object = nil
-        object_base64 = nil
-    else
+    local object_base64 = nil
+    local object_name_md5 = nil
+    if #object > 0 then
         object_base64 = ngx.encode_base64(object)
+        object_name_md5 = ngx.md5(object)
     end
 
     -- Make sure that the bucket name is valid
@@ -467,10 +466,12 @@ function M.parse_request()
     local r = {
         -- Plain text name of the object
         ['object'] = object,
+        -- MD5 checksum of text name of the object
+        ['object_name_md5'] = object_name_md5,
         -- Base64 name of the object
         ['object_base64'] = object_base64,
         -- Relative d/i/r/ectory to use in the file system
-        ['dir'] = M.get_directory_depth(object_base64),
+        ['dir'] = M.get_directory_depth(object_name_md5),
         -- Request method (HEAD, GET, POST, ..)
         ['method'] = ngx.var.request_method, 
         -- Name of the bucket
