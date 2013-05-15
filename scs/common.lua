@@ -493,39 +493,39 @@ end
 
 -- Given a directory, return a table with information about each file in that
 -- directory - recusively and sorted by mtime.
-function M.scandir(bucket)
-    -- If the directory does not exist, return an empty table here
-    local dir = M.get_storage_directory()
-    local path = dir
-
-    if bucket then
-        path = dir .. "/" .. bucket
-    end
-
-    if not M.is_file(path) then
-        return {}
-    end
-
-    local entry, objects, popen = nil, {}, io.popen
-    local counter = 0
-    for entry in popen('find ' .. path .. ' -type f -printf "%T@\t%s\t%f\t%h\n" | sort -nr'):lines() do
-        local m, err = ngx.re.match(entry, "^([0-9]+)[^\t]+\t([^\t]+)\t([^\t]+)\t" .. dir .. "/([^/]+).*$","j")
-        if m then
-            if #m == 4 then
-                local n = {}
-                n['mtime'] = tonumber(m[1])
-                n['LastModified'] = ngx.http_time(m[1])
-                n['size'] = tonumber(m[2])
-                local object = ngx.decode_base64(m[3])
-
-                if n['mtime'] and bucket == m[4] then
-                    objects[object] = n
-                end
-            end
-        end
-    end
-    --ngx.log(ngx.ERR,"Scanned the directory " .. path .. " and found " .. #objects .. " objects.")
-    return objects
-end
+-- function M.scandir(bucket)
+--     -- If the directory does not exist, return an empty table here
+--     local dir = M.get_storage_directory()
+--     local path = dir
+-- 
+--     if bucket then
+--         path = dir .. "/" .. bucket
+--     end
+-- 
+--     if not M.is_file(path) then
+--         return {}
+--     end
+-- 
+--     local entry, objects, popen = nil, {}, io.popen
+--     local counter = 0
+--     for entry in popen('find ' .. path .. ' -type f -printf "%T@\t%s\t%f\t%h\n" | sort -nr'):lines() do
+--         local m, err = ngx.re.match(entry, "^([0-9]+)[^\t]+\t([^\t]+)\t([^\t]+)\t" .. dir .. "/([^/]+).*$","j")
+--         if m then
+--             if #m == 4 then
+--                 local n = {}
+--                 n['mtime'] = tonumber(m[1])
+--                 n['LastModified'] = ngx.http_time(m[1])
+--                 n['size'] = tonumber(m[2])
+--                 local object = ngx.decode_base64(m[3])
+-- 
+--                 if n['mtime'] and bucket == m[4] then
+--                     objects[object] = n
+--                 end
+--             end
+--         end
+--     end
+--     --ngx.log(ngx.ERR,"Scanned the directory " .. path .. " and found " .. #objects .. " objects.")
+--     return objects
+-- end
 
 return M

@@ -5,92 +5,92 @@ local timer = require "scs.timer"
 --local Flexihash = require 'libs.Flexihash'
 local cjson = require 'cjson'
 
-local function bucket_index(r)
-    local exitcode = ngx.HTTP_NOT_FOUND
-    local msg
-    local internal = r['internal']
-    local bucket = r['bucket']
-
-    local max_keys = r['max-keys']
-    if not max_keys then
-        max_keys = 1000
-    end
-    local prefix = r['prefix']
-    local marker = r['marker']
-
-    if internal then
-        -- Return a table with the objects on this host
-        local objects = common.scandir(bucket)
-        if objects then
-            ngx.log(ngx.ERR,"Found " .. #objects .. " in the internal request")
-        end
-
-        local json = cjson.encode(objects)
-        if json then
-            ngx.print(json)
-            exitcode = ngx.HTTP_OK
-        end
-    else
-        -- Query the replica hosts for a table of objects
-        local conf = common.get_configuration()
-        local method = "GET"
-        local timeout = 10000
-        local path = "/?bucket=" .. bucket .. "&max-keys=" .. max_keys
-        local headers = {}
-        headers['user-agent'] = "scs internal"
-
-        local objects = {}
-        for host,h in pairs(conf.current.hosts) do
-            if common.get_host_status(host) then
-                local port = common.get_bind_port()
-                local status, body = common.http_request(host, port, headers, method, path, timeout)
-                if status then
-                    ngx.log(ngx.INFO,"Object list retrieved successfully from " .. host)
-                    local host_objects = cjson.decode(body)
-                    if host_objects then
-                        for host_object,v in pairs(host_objects) do
-                            if not objects[host_object] then
-                                v['replicas'] = 1
-                                v['replica_hosts'] = {}
-                                table.insert(v['replica_hosts'],host)
-                                objects[host_object] = v
-                            else
-                                table.insert(objects[host_object]['replica_hosts'],host)
-                                objects[host_object]['replicas'] = objects[host_object]['replicas'] + 1
-                                if objects[host_object]['mtime'] < v['mtime'] then
-                                    objects[host_object]['mtime'] = v['mtime']
-                                    objects[host_object]['LastModified'] = v['LastModified']
-                                end
-                            end
-                        end
-                    end
-                else
-                    ngx.log(ngx.WARN,"Failed to retrieve the object list from " .. host)
-                end
-            end
-        end
-
-        local res = {}
-        res['bucket'] = bucket
-        if prefix then
-            res['prefix'] = prefix
-        end
-        if marker then
-            res['marker'] = marker
-        end
-        res['contents'] = objects
-
-        -- for i,o in pairs(objects) do
-        -- end
-
-        local json = cjson.encode(res)
-        if json then
-            ngx.print(json)
-            exitcode = ngx.HTTP_OK
-        end
-    end
-    return exitcode
-end
+-- local function bucket_index(r)
+--     local exitcode = ngx.HTTP_NOT_FOUND
+--     local msg
+--     local internal = r['internal']
+--     local bucket = r['bucket']
+-- 
+--     local max_keys = r['max-keys']
+--     if not max_keys then
+--         max_keys = 1000
+--     end
+--     local prefix = r['prefix']
+--     local marker = r['marker']
+-- 
+--     if internal then
+--         -- Return a table with the objects on this host
+--         local objects = common.scandir(bucket)
+--         if objects then
+--             ngx.log(ngx.ERR,"Found " .. #objects .. " in the internal request")
+--         end
+-- 
+--         local json = cjson.encode(objects)
+--         if json then
+--             ngx.print(json)
+--             exitcode = ngx.HTTP_OK
+--         end
+--     else
+--         -- Query the replica hosts for a table of objects
+--         local conf = common.get_configuration()
+--         local method = "GET"
+--         local timeout = 10000
+--         local path = "/?bucket=" .. bucket .. "&max-keys=" .. max_keys
+--         local headers = {}
+--         headers['user-agent'] = "scs internal"
+-- 
+--         local objects = {}
+--         for host,h in pairs(conf.current.hosts) do
+--             if common.get_host_status(host) then
+--                 local port = common.get_bind_port()
+--                 local status, body = common.http_request(host, port, headers, method, path, timeout)
+--                 if status then
+--                     ngx.log(ngx.INFO,"Object list retrieved successfully from " .. host)
+--                     local host_objects = cjson.decode(body)
+--                     if host_objects then
+--                         for host_object,v in pairs(host_objects) do
+--                             if not objects[host_object] then
+--                                 v['replicas'] = 1
+--                                 v['replica_hosts'] = {}
+--                                 table.insert(v['replica_hosts'],host)
+--                                 objects[host_object] = v
+--                             else
+--                                 table.insert(objects[host_object]['replica_hosts'],host)
+--                                 objects[host_object]['replicas'] = objects[host_object]['replicas'] + 1
+--                                 if objects[host_object]['mtime'] < v['mtime'] then
+--                                     objects[host_object]['mtime'] = v['mtime']
+--                                     objects[host_object]['LastModified'] = v['LastModified']
+--                                 end
+--                             end
+--                         end
+--                     end
+--                 else
+--                     ngx.log(ngx.WARN,"Failed to retrieve the object list from " .. host)
+--                 end
+--             end
+--         end
+-- 
+--         local res = {}
+--         res['bucket'] = bucket
+--         if prefix then
+--             res['prefix'] = prefix
+--         end
+--         if marker then
+--             res['marker'] = marker
+--         end
+--         res['contents'] = objects
+-- 
+--         -- for i,o in pairs(objects) do
+--         -- end
+-- 
+--         local json = cjson.encode(res)
+--         if json then
+--             ngx.print(json)
+--             exitcode = ngx.HTTP_OK
+--         end
+--     end
+--     return exitcode
+-- end
 
 local function lookup_object(r)
     local exitcode = ngx.HTTP_NOT_FOUND
@@ -256,11 +256,12 @@ elseif method == "PUT" then
 elseif method == "DELETE" then
     exitcode = delete_object(r['internal'], r['bucket'], r['object'])
 elseif method == "GET" or method == "HEAD" then
-    if r['bucket'] and not r['object'] then
-        exitcode = bucket_index(r)
-    elseif r['bucket'] and r['object'] then
-        exitcode = lookup_object(r)
-    end
+    -- if r['bucket'] and not r['object'] then
+    --     exitcode = bucket_index(r)
+    -- elseif r['bucket'] and r['object'] then
+    --     exitcode = lookup_object(r)
+    -- end
+    exitcode = lookup_object(r)
 end
 
 local elapsed = ngx.now() - ngx.req.start_time()
