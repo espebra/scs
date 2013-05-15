@@ -431,7 +431,7 @@ function M.parse_request()
     local internal = M.is_internal_request(h['user-agent'])
     local debug = h['x-debug']
     local status = h['x-status']
-    local md5 = h['x-md5']
+    local object_md5 = h['x-md5']
 
     local args = ngx.req.get_uri_args()
 
