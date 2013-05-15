@@ -342,10 +342,10 @@ end
 function M.get_directory_depth(object_base64)
     local dir = false
     if object_base64 then
-        local m, err = ngx.re.match(object_base64, "^(..)(..)(..)",'j')
+        local m, err = ngx.re.match(object_base64, "^(..)(..)",'j')
         if m then
             if #m == 3 then
-                dir = m[1] .. "/" .. m[2] .. "/" .. m[3]
+                dir = m[1] .. "/" .. m[2]
             end
         end
     end
