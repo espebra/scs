@@ -433,6 +433,16 @@ function M.parse_request()
     local status = h['x-status']
     local object_md5 = h['x-md5']
 
+    -- Check the md5 content
+    if not ngx.re.match(object_md5, '^[a-f0-9]+$','j') then
+        object_md5 = nil
+    end
+
+    -- Check the md5 length
+    if not #object_md5 == 32 then
+        object_md5 = nil
+    end
+
     local args = ngx.req.get_uri_args()
 
     -- The bucket is the value of the argument bucket, or the hostname in the
