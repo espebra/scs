@@ -553,10 +553,10 @@ function M.replicate_object(hosts, bucket, object)
     end
     if count > (#hosts/2) then
         status = true
-        ngx.log("Successfully replicated to " .. count .. " hosts. That is more than " .. #hosts/2)
+        ngx.log(ngx.ERR,"Successfully replicated to " .. count .. " hosts. That is more than " .. #hosts/2)
     else
         status = false
-        ngx.log("Successfully replicated to " .. count .. " hosts. That is less than " .. #hosts/2)
+        ngx.log(ngx.ERR,"Successfully replicated to " .. count .. " hosts. That is less than " .. #hosts/2)
     end
     return status
 end
@@ -580,18 +580,21 @@ function M.get_local_object_versions(bucket, object)
     local versions = {}
 
     local entry, versions, popen = nil, {}, io.popen
-    for entry in popen('find ' .. path .. ' -type f -printf "%T@\t%s\t%f\n"'):lines() do
-        local m, err = ngx.re.match(entry, "^([0-9]+)[^\t]+\t([^\t]+)\t(.+).data$","j")
-        if m then
-            if #m == 3 then
-                local n = {}
-                n['mtime'] = tonumber(m[1])
-                n['size'] = tonumber(m[2])
-                local version = m[3]
-                versions[version] = n
+    if M.is_file(path) then
+        for entry in popen('find ' .. path .. ' -type f -printf "%T@\t%s\t%f\n"'):lines() do
+            local m, err = ngx.re.match(entry, "^([0-9]+)[^\t]+\t([0-9]+)\t([0-9]+).data$","j")
+            if m then
+                if #m == 3 then
+                    local n = {}
+                    n['mtime'] = tonumber(m[1])
+                    n['size'] = tonumber(m[2])
+                    n['version'] = tonumber(m[3])
+                    table.insert(versions, n)
+                end
             end
         end
     end
+    ngx.log(ngx.ERR,"Found " .. #versions .. " versions locally of " .. bucket .. "/" .. object)
     return versions
 end
     
