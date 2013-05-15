@@ -592,7 +592,7 @@ function M.get_local_object_versions(bucket, object)
                     n['mtime'] = tonumber(m[1])
                     n['size'] = tonumber(m[2])
                     n['version'] = tonumber(m[3])
-                    n['md5'] = tonumber(m[4])
+                    n['md5'] = m[4]
                     table.insert(versions, n)
                 end
             end
