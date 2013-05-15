@@ -553,10 +553,10 @@ function M.replicate_object(hosts, bucket, object)
     end
     if count > (#hosts/2) then
         status = true
-        ngx.log(ngx.ERR,"Successfully replicated to " .. count .. " hosts. That is more than " .. #hosts/2)
+        ngx.log(ngx.INFO,"Successfully replicated to " .. count .. " hosts. That is more than " .. #hosts/2)
     else
         status = false
-        ngx.log(ngx.ERR,"Successfully replicated to " .. count .. " hosts. That is less than " .. #hosts/2)
+        ngx.log(ngx.ERR,"Managed to replicate to " .. count .. " hosts. That is not more replicas than " .. #hosts/2 .. ", so report the write as failed.")
     end
     return status
 end
@@ -594,7 +594,7 @@ function M.get_local_object_versions(bucket, object)
             end
         end
     end
-    ngx.log(ngx.ERR,"Found " .. #versions .. " versions locally of " .. bucket .. "/" .. object)
+    ngx.log(ngx.INFO,"Found " .. #versions .. " versions locally of " .. bucket .. "/" .. object)
     return versions
 end
     
