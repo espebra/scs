@@ -431,6 +431,7 @@ function M.parse_request()
     local internal = M.is_internal_request(h['user-agent'])
     local debug = h['x-debug']
     local status = h['x-status']
+    local md5 = h['x-md5']
 
     local args = ngx.req.get_uri_args()
 
@@ -471,6 +472,8 @@ function M.parse_request()
     local r = {
         -- Plain text name of the object
         ['object'] = object,
+        -- The md5 checksum of the body, given by the client
+        ['object_md5'] = object_md5,
         -- MD5 checksum of text name of the object
         ['object_name_md5'] = object_name_md5,
         -- Base64 name of the object
