@@ -434,13 +434,15 @@ function M.parse_request()
     local object_md5 = h['x-md5']
 
     -- Check the md5 content
-    if not ngx.re.match(object_md5, '^[a-f0-9]+$','j') then
-        object_md5 = nil
-    end
+    if object_md5 then
+        if not ngx.re.match(object_md5, '^[a-f0-9]+$','j') then
+            object_md5 = nil
+        end
 
-    -- Check the md5 length
-    if not #object_md5 == 32 then
-        object_md5 = nil
+        -- Check the md5 length
+        if not #object_md5 == 32 then
+            object_md5 = nil
+        end
     end
 
     local args = ngx.req.get_uri_args()
