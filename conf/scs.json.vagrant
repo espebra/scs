@@ -12,7 +12,7 @@
             }
         },
         "replica_sites": 2,
-        "replicas_per_site": 2,
+        "replicas_per_site": 1,
         "storage_directory": "/srv/files",
         "bind_port": 80
     },
