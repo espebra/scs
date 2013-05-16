@@ -1,0 +1,21 @@
+{
+    "current": {
+        "hosts": {
+            "scs1.local"
+                "site": "dc1"
+            },
+            "scs2.local"
+                "site": "dc1"
+            },
+            "scs3.local
+                "site": "dc2"
+            }
+        },
+        "replica_sites": 2,
+        "replicas_per_site": 2,
+        "storage_directory": "/srv/files",
+        "bind_port": 80
+    },
+    "future": {
+    }
+}
