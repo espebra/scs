@@ -17,22 +17,9 @@ function M.initiate_periodic_health_checks(delay)
             return
         end
 
+        local sites = common.get_all_sites()
         while true do
-            local port = common.get_bind_port()
-            local sites = common.get_all_sites()
-            sites = common.randomize_table(sites)
-            for i,site in ipairs(sites) do
-                --ngx.log(ngx.ERR,"Checking site " .. site)
-                local hosts = common.get_site_hosts(site)
-                hosts = common.randomize_table(hosts)
-                for i,host in ipairs(hosts) do
-                    --ngx.log(ngx.ERR,"Checking host " .. host .. " on site " .. site)
-                    local status=common.remote_host_availability(host, port)
-                    -- Status is true or false to indicate if the host is
-                    -- available or not.
-                    common.update_host_status(host,status)
-                end
-            end
+            common.update_status_for_all_hosts(sites)
             ngx.sleep(delay)
         end
         return
@@ -59,11 +46,53 @@ function M.initiate_batch_synchronization(delay)
             return
         end
 
+        local path = common.get_storage_directory()
+        if not common.is_file(path) then
+            ngx.log(ngx.ERR,"Unable to start the sync prosess!" .. path .. " does not exist")
+            return
+        end
+
         while true do
-            ngx.log(ngx.ERR, "Execute batch synchronization now!")
-            ngx.log(ngx.ERR, "Work start")
-            ngx.sleep(300)
-            ngx.log(ngx.ERR, "Work complete")
+            local start = ngx.time()
+            local versions = {}
+
+            ngx.log(ngx.ERR,"Batch job started")
+
+            local entry, versions, popen = nil, {}, io.popen
+            for entry in popen('find ' .. path .. ' -type f -printf "%T@\t%s\t%f\t%h\n" | sort -nr'):lines() do
+                local m, err = ngx.re.match(entry, "^([0-9]+)[^\t]+\t([0-9]+)\t([0-9]+)-([a-f0-9]+).([a-z]+)\t" .. path .. "/([^/]+).*/([^/]+)$","j")
+                if m then
+                    if #m == 7 then
+                        local mtime = tonumber(m[1])
+                        local size = tonumber(m[2])
+                        local version = tonumber(m[3])
+                        local md5 = m[4]
+                        local filetype = m[5]
+                        local bucket = m[6]
+                        local object_base64 = m[7]
+                        local object = ngx.decode_base64(object_base64)
+
+                        ngx.log(ngx.ERR,"mtime: " .. m[1] .. ", size: " .. m[2] .. ", version: " .. m[3] .. ", md5: " .. m[4] .. ", type: " .. m[5] .. ", bucket: " .. m[6])
+
+                        if filetype == "data" then
+                            local valid = common.is_checksum_valid(bucket, object, version, md5)
+                            if valid then
+                                ngx.log(ngx.ERR,"Object " .. bucket .. "/" .. object .. " version " .. version .. " is valid")
+                                -- Replicate to other hosts.
+                            else
+                                ngx.log(ngx.ERR,"Object " .. bucket .. "/" .. object .. " version " .. version .. " is corrupt")
+                                -- common.quarantine(bucket, object, version, md5)
+    
+                            end
+                        elseif filetype == "ts" then
+                            -- Remove old versions if tombstone exists.
+                        end
+                    end
+                end
+            end
+            
+            local elapsed = ngx.now() - start
+            ngx.log(ngx.ERR,"Batch job completed in " .. elapsed .. " seconds.")
             ngx.sleep(delay)
         end
     end

@@ -24,7 +24,7 @@ end
 local r = common.parse_request()
 
 -- Start periodic batch jobs here
-timer.initiate_periodic_health_checks(1)
+timer.initiate_periodic_health_checks(3)
 timer.initiate_batch_synchronization(900)
 
 -- Return 200 to the status check

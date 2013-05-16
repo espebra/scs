@@ -244,7 +244,7 @@ elseif method == "GET" or method == "HEAD" then
     -- elseif r['bucket'] and r['object'] then
     --     exitcode = lookup_object(r)
     -- end
-    exitcode = lookup_object(r)
+    exitcode, msg = lookup_object(r)
 end
 
 local elapsed = ngx.now() - ngx.req.start_time()

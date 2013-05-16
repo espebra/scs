@@ -613,5 +613,53 @@ function M.get_local_object_versions(bucket, object)
     ngx.log(ngx.INFO,"Found " .. #versions .. " versions locally of " .. bucket .. "/" .. object)
     return versions
 end
+
+-- Function to fetch host status and update the cached status for all hosts
+-- found in the configuration.
+function M.update_status_for_all_hosts(sites)
+    sites = M.randomize_table(sites)
+    local port = M.get_bind_port()
+    local unavailable = {}
+    local total_hosts = 0
+    for i,site in ipairs(sites) do
+        local hosts = M.get_site_hosts(site)
+        hosts = M.randomize_table(hosts)
+        total_hosts = total_hosts + #hosts
+        for i,host in ipairs(hosts) do
+            local status = M.remote_host_availability(host, port)
+            -- Status is true or false to indicate if the host is
+            -- available or not.
+            M.update_host_status(host,status)
+
+            if not status then
+                table.insert(unavailable,host)
+            end
+        end
+    end
+
+    if #unavailable > 0 then
+        ngx.log(ngx.ERR,#unavailable .. " of the " .. total_hosts .. " hosts are unavailable: " .. tostring(unavailable))
+    end
+end
+
+-- Verify the checksum of the file. Return true if valid, false if corrupt.
+function M.is_checksum_valid(bucket, object, version, md5)
+    local path = M.get_local_object_path(bucket, object)
+    local f = path .. "/" .. version .. "-" .. md5 .. ".data"
+
+    local valid = false
+    if M.is_file(f) then
+         -- Calculate checksum here
+         ngx.log(ngx.ERR,"Calculate checksum of " .. f)
+         -- local current_checksum = md5(f)
+         -- if current_checksum == md5 then
+         --     valid = true
+         -- else
+         --     valid = false
+         --     ngx.log(ngx.ERR,"File " .. f .. " is corrupt. Checksum mismatch")
+         -- end
+    end
+    return valid
+end
     
 return M
