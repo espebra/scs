@@ -16,8 +16,8 @@ function M.initiate_periodic_health_checks(delay)
         if premature then
             return
         end
-        local ok, err = ngx.timer.at(delay, handler)
-        if ok then
+
+        while true do
             local port = common.get_bind_port()
             local sites = common.get_all_sites()
             sites = common.randomize_table(sites)
@@ -33,15 +33,14 @@ function M.initiate_periodic_health_checks(delay)
                     common.update_host_status(host,status)
                 end
             end
-        else
-            ngx.log(ngx.ERR, "Failed to create the timer: ", err)
-            return
+            ngx.sleep(delay)
         end
+        return
     end
 
-    local ok, err = ngx.timer.at(delay, handler)
+    local ok, err = ngx.timer.at(0, handler)
     if not ok then
-        ngx.log(ngx.ERR, "failed to create the timer: ", err)
+        ngx.log(ngx.ERR, "Failed to create the health check timer: " .. err)
         return
     end
 end
@@ -59,21 +58,19 @@ function M.initiate_batch_synchronization(delay)
         if premature then
             return
         end
-        local ok, err = ngx.timer.at(delay, handler)
-        if ok then
+
+        while true do
             ngx.log(ngx.ERR, "Execute batch synchronization now!")
             ngx.log(ngx.ERR, "Work start")
             ngx.sleep(300)
             ngx.log(ngx.ERR, "Work complete")
-        else
-            ngx.log(ngx.ERR, "Failed to create the timer: ", err)
-            return
+            ngx.sleep(delay)
         end
     end
 
-    local ok, err = ngx.timer.at(delay, handler)
+    local ok, err = ngx.timer.at(0, handler)
     if not ok then
-        ngx.log(ngx.ERR, "failed to create the timer: ", err)
+        ngx.log(ngx.ERR, "Failed to create the synchronization timer: " .. err)
         return
     end
 end
