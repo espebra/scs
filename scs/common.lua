@@ -508,7 +508,7 @@ function M.parse_request()
     }
 
     -- Clean up
-    ngx.header['server'] = 'scs'
+    ngx.header['Server'] = 'scs'
     return r
 end
 
