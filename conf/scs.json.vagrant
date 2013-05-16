@@ -1,13 +1,13 @@
 {
     "current": {
         "hosts": {
-            "scs1.local"
+            "10.0.0.2" : {
                 "site": "dc1"
             },
-            "scs2.local"
+            "10.0.0.3" : {
                 "site": "dc1"
             },
-            "scs3.local
+            "10.0.0.4" : {
                 "site": "dc2"
             }
         },
