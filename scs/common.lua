@@ -62,37 +62,37 @@ function M.verify_bucket(bucket)
 
     -- Must not be false
     if not bucket then
-        ngx.log(ngx.ERR,"Bucket name is not set")
+        --ngx.log(ngx.WARN,"Bucket name is not set")
         return false
     end
 
     -- Must not be less than 3 characters
     if #bucket < 3 then
-        ngx.log(ngx.ERR,"Bucket name is too short")
+        --ngx.log(ngx.WARN,"Bucket name is too short")
         return false
     end
 
     -- Must not be more than 63 characters
     if #bucket > 63 then
-        ngx.log(ngx.ERR,"Bucket name is too long")
+        --ngx.log(ngx.WARN,"Bucket name is too long")
         return false
     end
 
     -- Must contain only allowed characters
     if not ngx.re.match(bucket, '^[a-z0-9-]+$','j') then
-        ngx.log(ngx.ERR,"Bucket name contains illegal characters")
+        --ngx.log(ngx.WARN,"Bucket name contains illegal characters")
         return false
     end
 
     -- Must not start with -
     if ngx.re.match(bucket, '^-','j') then
-        ngx.log(ngx.ERR,"Bucket name starts with -")
+        --ngx.log(ngx.WARN,"Bucket name starts with -")
         return false
     end
 
     -- Must not end with -
     if ngx.re.match(bucket, '-$','j') then
-        ngx.log(ngx.ERR,"Bucket name ends with -")
+        --ngx.log(ngx.WARN,"Bucket name ends with -")
         return false
     end
 
