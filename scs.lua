@@ -135,6 +135,10 @@ local function lookup_object(r)
 end
 
 local function post_object(r)
+    if not r['object_md5'] or not r['object'] or not r['bucket'] then
+        ngx.log(ngx.ERR,"Missing input data")
+        ngx.exit(ngx.HTTP_BAD_REQUEST)
+    end
     local internal = r['internal']
     local bucket = r['bucket']
     local object = r['object']

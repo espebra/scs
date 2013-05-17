@@ -71,18 +71,31 @@ function M.initiate_batch_synchronization(delay)
                         local bucket = m[6]
                         local object_base64 = m[7]
                         local object = ngx.decode_base64(object_base64)
+                        local filename = version .. "-" .. md5 .. "." .. filetype
 
-                        ngx.log(ngx.ERR,"mtime: " .. m[1] .. ", size: " .. m[2] .. ", version: " .. m[3] .. ", md5: " .. m[4] .. ", type: " .. m[5] .. ", bucket: " .. m[6])
+                        -- ngx.log(ngx.ERR,"mtime: " .. m[1] .. ", size: " .. m[2] .. ", version: " .. m[3] .. ", md5: " .. m[4] .. ", type: " .. m[5] .. ", bucket: " .. m[6])
 
                         if filetype == "data" then
                             local valid = common.is_checksum_valid(bucket, object, version, md5)
                             if valid then
-                                ngx.log(ngx.ERR,"Object " .. bucket .. "/" .. object .. " version " .. version .. " is valid")
                                 -- Replicate to other hosts.
+                                local sites = common.get_object_replica_sites(bucket, object)
+                                local hosts = common.get_replica_hosts(bucket, object, sites)
+                                for _,host in pairs(hosts) do
+                                    if common.get_host_status(host) then
+                                        local res = common.sync_object(host, bucket, object, filename)
+                                        if res then
+                                            ngx.log(ngx.INFO,"Object " .. bucket .. "/" .. object .. " version " .. version .. " was replicated to " .. host)
+                                        else
+                                            ngx.log(ngx.ERR,"Object " .. bucket .. "/" .. object .. " version " .. version .. " was NOT replicated to " .. host)
+                                        end
+                                    else
+                                        ngx.log(ngx.ERR,host .. " is down. Unable to replicate.")
+                                    end
+                                end
                             else
                                 ngx.log(ngx.ERR,"Object " .. bucket .. "/" .. object .. " version " .. version .. " is corrupt")
                                 -- common.quarantine(bucket, object, version, md5)
-    
                             end
                         -- elseif filetype == "ts" then
                             -- Remove old versions if tombstone exists.
@@ -97,7 +110,7 @@ function M.initiate_batch_synchronization(delay)
         end
     end
 
-    local ok, err = ngx.timer.at(0, handler)
+    local ok, err = ngx.timer.at(5, handler)
     if not ok then
         ngx.log(ngx.ERR, "Failed to create the synchronization timer: " .. err)
         return

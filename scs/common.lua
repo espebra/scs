@@ -40,7 +40,7 @@ function M.get_host_status(host)
 end
 
 -- Update the status for a host
-function M.update_host_status(host,status)
+function M.update_host_status(host, status)
     local s = ngx.shared.status
     local success, err, forcible
     if status then
@@ -106,7 +106,7 @@ end
 -- end
 
 -- Return the value of a given request header, or nil if the header is not set
-function M.get_header(header,headers)
+function M.get_header(header, headers)
     if headers[header] then
         return headers[header]
     end
@@ -114,7 +114,7 @@ function M.get_header(header,headers)
 end
 
 -- Return the value of a given request parameter, or nil if the parameter is not set
-function M.get_parameter(parameter,parameters)
+function M.get_parameter(parameter, parameters)
     if parameters[parameter] then
         return parameters[parameter]
     end
@@ -123,13 +123,14 @@ end
 
 -- Check if a path is a file in the local file system
 function M.is_file(path)
-   local f=io.open(path,"r")
-   if f~=nil then
-       io.close(f)
-       return true
-    else
-        return false
-    end
+   if path then
+       local f=io.open(path,"r")
+       if f~=nil then
+           io.close(f)
+           return true
+       end
+   end
+   return false
 end
 
 function M.http_request(host, port, headers, method, path, timeout)
@@ -289,7 +290,7 @@ function M.sync_object(host, bucket, object, filename)
     local object_base64 = ngx.encode_base64(object)
     local depth = M.get_directory_depth(object)
     
-    local cmd="cd " .. dir .. " && /usr/bin/rsync -RrzSut " .. bucket .. "/" .. depth .. "/" .. object_base64 .. "/" .. filename .. " rsync://" .. host .. "/scs"
+    local cmd="cd " .. dir .. " && /usr/bin/rsync -RzSut " .. bucket .. "/" .. depth .. "/" .. object_base64 .. "/" .. filename .. " rsync://" .. host .. "/scs"
     local res = os.execute(cmd)
     if res == 0 then
         return true
@@ -436,11 +437,13 @@ function M.parse_request()
     -- Check the md5 content
     if object_md5 then
         if not ngx.re.match(object_md5, '^[a-f0-9]+$','j') then
+            ngx.log(ngx.ERR,"Request md5 header contains non-valid characters")
             object_md5 = nil
         end
 
         -- Check the md5 length
         if not #object_md5 == 32 then
+            ngx.log(ngx.ERR,"Request md5 header length is invalid")
             object_md5 = nil
         end
     end
@@ -580,6 +583,16 @@ function M.get_local_object_path(bucket, object)
     local dir = M.get_storage_directory()
     local path = nil
 
+    if not bucket then
+        ngx.log(ngx.ERR,"Bucket not set")
+        return nil
+    end
+
+    if not object then
+        ngx.log(ngx.ERR,"Object not set")
+        return nil
+    end
+
     if dir then
         local object_base64 = ngx.encode_base64(object)
         local depth = M.get_directory_depth(object)
@@ -648,9 +661,9 @@ function M.is_checksum_valid(bucket, object, version, md5)
     local f = path .. "/" .. version .. "-" .. md5 .. ".data"
 
     local valid = false
-    if M.is_file(f) then
+    --if M.is_file(f) then
          -- Calculate checksum here
-         ngx.log(ngx.ERR,"Calculate checksum of " .. f)
+         -- ngx.log(ngx.ERR,"Calculate checksum of " .. f)
          -- local current_checksum = md5(f)
          -- if current_checksum == md5 then
          --     valid = true
@@ -658,7 +671,7 @@ function M.is_checksum_valid(bucket, object, version, md5)
          --     valid = false
          --     ngx.log(ngx.ERR,"File " .. f .. " is corrupt. Checksum mismatch")
          -- end
-    end
+    --end
 
     -- TODO: Remove when the checksum thing has been written.
     valid = true
