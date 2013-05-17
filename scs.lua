@@ -184,7 +184,7 @@ local function post_object(r)
         else
             ngx.log(ngx.INFO,'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system (' .. path .. '/' .. object_name_on_disk .. ')')
 
-            if common.replicate_object(hosts, bucket, object) then
+            if common.replicate_object(hosts, bucket, object, object_name_on_disk) then
                 exitcode = ngx.HTTP_OK
             end
         end

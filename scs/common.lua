@@ -284,12 +284,12 @@ function M.look_up_hash_map(hash, hash_map, replicas)
     return result
 end
 
-function M.sync_object(host, bucket, object)
+function M.sync_object(host, bucket, object, filename)
     local dir = M.get_storage_directory()
     local object_base64 = ngx.encode_base64(object)
     local depth = M.get_directory_depth(object)
     
-    local cmd="cd " .. dir .. " && /usr/bin/rsync -RrzSut " .. bucket .. "/" .. depth .. "/" .. object_base64 .. " rsync://" .. host .. "/scs"
+    local cmd="cd " .. dir .. " && /usr/bin/rsync -RrzSut " .. bucket .. "/" .. depth .. "/" .. object_base64 .. "/" .. filename .. " rsync://" .. host .. "/scs"
     local res = os.execute(cmd)
     if res == 0 then
         return true
@@ -549,13 +549,13 @@ end
 --     return objects
 -- end
 
-function M.replicate_object(hosts, bucket, object)
+function M.replicate_object(hosts, bucket, object, filename)
     -- Replicate the object to other hosts here.
     local status = false
     local count = 0
     for _,host in pairs(hosts) do
         if M.get_host_status(host) then
-            local res = M.sync_object(host, bucket, object)
+            local res = M.sync_object(host, bucket, object, filename)
             if res then
                 ngx.log(ngx.NOTICE,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " succeeded.")
                 count = count + 1
@@ -566,12 +566,12 @@ function M.replicate_object(hosts, bucket, object)
             ngx.log(ngx.WARN,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " not initiated. The host is down.")
         end
     end
-    if count > (#hosts/2) then
+    if count >= (#hosts/2) then
         status = true
-        ngx.log(ngx.INFO,"Successfully replicated to " .. count .. " hosts. That is more than " .. #hosts/2)
+        ngx.log(ngx.INFO,"Successfully replicated to " .. count .. " hosts. That is more or equal than " .. #hosts/2)
     else
         status = false
-        ngx.log(ngx.ERR,"Managed to replicate to " .. count .. " hosts. That is not more replicas than " .. #hosts/2 .. ", so report the write as failed.")
+        ngx.log(ngx.ERR,"Managed to replicate to " .. count .. " hosts. That is less replicas than " .. #hosts/2 .. ", so report the write as failed.")
     end
     return status
 end
@@ -659,6 +659,9 @@ function M.is_checksum_valid(bucket, object, version, md5)
          --     ngx.log(ngx.ERR,"File " .. f .. " is corrupt. Checksum mismatch")
          -- end
     end
+
+    -- TODO: Remove when the checksum thing has been written.
+    valid = true
     return valid
 end
     

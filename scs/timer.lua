@@ -84,7 +84,7 @@ function M.initiate_batch_synchronization(delay)
                                 -- common.quarantine(bucket, object, version, md5)
     
                             end
-                        elseif filetype == "ts" then
+                        -- elseif filetype == "ts" then
                             -- Remove old versions if tombstone exists.
                         end
                     end
