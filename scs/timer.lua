@@ -57,53 +57,7 @@ function M.initiate_batch_synchronization(delay)
             local versions = {}
 
             ngx.log(ngx.ERR,"Batch job started")
-
-            local entry, versions, popen = nil, {}, io.popen
-            for entry in popen('find ' .. path .. ' -type f -printf "%T@\t%s\t%f\t%h\n" | sort -nr'):lines() do
-                local m, err = ngx.re.match(entry, "^([0-9]+)[^\t]+\t([0-9]+)\t([0-9]+)-([a-f0-9]+).([a-z]+)\t" .. path .. "/([^/]+).*/([^/]+)$","j")
-                if m then
-                    if #m == 7 then
-                        local mtime = tonumber(m[1])
-                        local size = tonumber(m[2])
-                        local version = tonumber(m[3])
-                        local md5 = m[4]
-                        local filetype = m[5]
-                        local bucket = m[6]
-                        local object_base64 = m[7]
-                        local object = ngx.decode_base64(object_base64)
-                        local filename = version .. "-" .. md5 .. "." .. filetype
-
-                        -- ngx.log(ngx.ERR,"mtime: " .. m[1] .. ", size: " .. m[2] .. ", version: " .. m[3] .. ", md5: " .. m[4] .. ", type: " .. m[5] .. ", bucket: " .. m[6])
-
-                        if filetype == "data" then
-                            local valid = common.is_checksum_valid(bucket, object, version, md5)
-                            if valid then
-                                -- Replicate to other hosts.
-                                local sites = common.get_object_replica_sites(bucket, object)
-                                local hosts = common.get_replica_hosts(bucket, object, sites)
-                                for _,host in pairs(hosts) do
-                                    if common.get_host_status(host) then
-                                        local res = common.sync_object(host, bucket, object, filename)
-                                        if res then
-                                            ngx.log(ngx.INFO,"Object " .. bucket .. "/" .. object .. " version " .. version .. " was replicated to " .. host)
-                                        else
-                                            ngx.log(ngx.ERR,"Object " .. bucket .. "/" .. object .. " version " .. version .. " was NOT replicated to " .. host)
-                                        end
-                                    else
-                                        ngx.log(ngx.ERR,host .. " is down. Unable to replicate.")
-                                    end
-                                end
-                            else
-                                ngx.log(ngx.ERR,"Object " .. bucket .. "/" .. object .. " version " .. version .. " is corrupt")
-                                -- common.quarantine(bucket, object, version, md5)
-                            end
-                        -- elseif filetype == "ts" then
-                            -- Remove old versions if tombstone exists.
-                        end
-                    end
-                end
-            end
-            
+            common.full_replication()
             local elapsed = ngx.now() - start
             ngx.log(ngx.ERR,"Batch job completed in " .. elapsed .. " seconds.")
             ngx.sleep(delay)
