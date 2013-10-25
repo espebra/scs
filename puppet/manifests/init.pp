@@ -37,6 +37,8 @@ file {
     '/srv/files':
         ensure  => directory,
         require => File["/srv"];
+    '/etc/scs':
+        ensure  => directory;
     '/srv/scs':
         ensure => link,
         require => File["/srv"],
@@ -61,6 +63,10 @@ file {
         ensure  => link,
         source  => '/vagrant/scs/conf/scs.init.example',
         notify  => Service["scs"];
+    '/etc/scs/scs.conf':
+        ensure  => link,
+        source  => '/vagrant/scs/conf/scs.conf',
+        notify  => Service["scs"];
 }
 
 # Building openresty
@@ -72,12 +78,12 @@ Exec {
 
 exec {
     'extract':
-        command     => "tar -xvzf /ngx_openresty-${ngx_version}.tar.gz -C /tmp",
+        command     => "tar -xvzf ngx_openresty-${ngx_version}.tar.gz -C /tmp",
         cwd         => '/vagrant/src',
         creates     => "/tmp/ngx_openresty-${ngx_version}",
         notify      => Exec['configure'];
     'configure':
-        command   => 'configure --with-luajit --with-pcre-jit --prefix=/usr/local/openresty --with-ipv6',
+        command   => 'configure --with-luajit --with-pcre-jit --prefix=/usr/local/openresty --with-ipv6 --error-log-path=/var/log/scs/error.log --http-log-path=/var/log/scs/access.log',
         path      => [ '/bin/', '/sbin/', '/usr/bin/', '/usr/sbin/', "/tmp/ngx_openresty-${ngx_version}" ],
         cwd       => "/tmp/ngx_openresty-${ngx_version}",
         refreshonly => true,

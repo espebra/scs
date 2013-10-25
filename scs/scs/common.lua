@@ -232,7 +232,7 @@ function M.get_configuration()
     local json = c:get('conf')
     -- local conf, flags = c:get('conf')
     if not json then
-        local path = "/etc/scs/scs.json"
+        local path = "/etc/scs/scs.conf"
         json = read_file(path, true)
         c:set('conf', json)
         ngx.log(ngx.INFO, "Caching: Configuration")
