@@ -42,12 +42,18 @@ end
 -- Update the status for a host
 function M.update_host_status(host, status)
     local s = ngx.shared.status
-    local success, err, forcible
-    if status then
-        success, err, forcible = s:set(host, true)
-    else
-        success, err, forcible = s:set(host, false)
+
+    local previous_status = s:get(host)
+    if not previous_status == status then
+        if status then
+            ngx.log(ngx.ERR,"Host " .. host .. " is now up!")
+        else
+            ngx.log(ngx.ERR,"Host " .. host .. " is now unavailable!")
+        end
     end
+
+    local success, err, forcible
+    success, err, forcible = s:set(host, true)
 
     if success then
         return true
@@ -142,7 +148,7 @@ function M.http_request(host, port, headers, method, path, timeout)
         headers = headers
     })
     if not res then
-        ngx.log(ngx.ERR,"Unable to execute " .. method .. " to http://" .. host .. ":" .. port .. path .. ": " .. err)
+        ngx.log(ngx.DEBUG,"Unable to execute " .. method .. " to http://" .. host .. ":" .. port .. path .. ": " .. err)
         return nil
     end
 
@@ -654,7 +660,7 @@ function M.update_status_for_all_hosts(sites)
     end
 
     if #unavailable > 0 then
-        ngx.log(ngx.ERR,#unavailable .. " of the " .. total_hosts .. " hosts are unavailable: " .. tostring(unavailable))
+        ngx.log(ngx.DEBUG,#unavailable .. " of the " .. total_hosts .. " hosts are unavailable: " .. tostring(unavailable))
     end
 end
 
