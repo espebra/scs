@@ -13,7 +13,7 @@ cd /srv/scs
 
 start() {
         echo "Starting"
-        nohup nginx -p /srv/scs/ -c /srv/scs/conf/nginx.conf &
+        nohup nginx -p /srv/scs/ -c /srv/scs/conf/nginx.conf > /var/log/scs/nohub.log
         return
 }
 
@@ -40,7 +40,7 @@ case "$1" in
         ;;
     restart)
         stop
-        sleep 1
+        sleep 0.3
         start
         ;;
     reload)

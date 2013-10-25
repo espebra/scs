@@ -40,7 +40,7 @@ function M.get_host_status(host)
 end
 
 -- Update the status for a host
-function M.update_host_status(host,status)
+function M.update_host_status(host, status)
     local s = ngx.shared.status
     local success, err, forcible
     if status then
@@ -106,7 +106,7 @@ end
 -- end
 
 -- Return the value of a given request header, or nil if the header is not set
-function M.get_header(header,headers)
+function M.get_header(header, headers)
     if headers[header] then
         return headers[header]
     end
@@ -114,7 +114,7 @@ function M.get_header(header,headers)
 end
 
 -- Return the value of a given request parameter, or nil if the parameter is not set
-function M.get_parameter(parameter,parameters)
+function M.get_parameter(parameter, parameters)
     if parameters[parameter] then
         return parameters[parameter]
     end
@@ -123,13 +123,14 @@ end
 
 -- Check if a path is a file in the local file system
 function M.is_file(path)
-   local f=io.open(path,"r")
-   if f~=nil then
-       io.close(f)
-       return true
-    else
-        return false
-    end
+   if path then
+       local f=io.open(path,"r")
+       if f~=nil then
+           io.close(f)
+           return true
+       end
+   end
+   return false
 end
 
 function M.http_request(host, port, headers, method, path, timeout)
@@ -284,12 +285,12 @@ function M.look_up_hash_map(hash, hash_map, replicas)
     return result
 end
 
-function M.sync_object(host, bucket, object)
+function M.sync_object(host, bucket, object, filename)
     local dir = M.get_storage_directory()
     local object_base64 = ngx.encode_base64(object)
     local depth = M.get_directory_depth(object)
     
-    local cmd="cd " .. dir .. " && /usr/bin/rsync -RrzSut " .. bucket .. "/" .. depth .. "/" .. object_base64 .. " rsync://" .. host .. "/scs"
+    local cmd="cd " .. dir .. " && /usr/bin/rsync -RzSut " .. bucket .. "/" .. depth .. "/" .. object_base64 .. "/" .. filename .. " rsync://" .. host .. "/scs"
     local res = os.execute(cmd)
     if res == 0 then
         return true
@@ -436,11 +437,13 @@ function M.parse_request()
     -- Check the md5 content
     if object_md5 then
         if not ngx.re.match(object_md5, '^[a-f0-9]+$','j') then
+            ngx.log(ngx.ERR,"Request md5 header contains non-valid characters")
             object_md5 = nil
         end
 
         -- Check the md5 length
         if not #object_md5 == 32 then
+            ngx.log(ngx.ERR,"Request md5 header length is invalid")
             object_md5 = nil
         end
     end
@@ -549,13 +552,13 @@ end
 --     return objects
 -- end
 
-function M.replicate_object(hosts, bucket, object)
+function M.replicate_object(hosts, bucket, object, filename)
     -- Replicate the object to other hosts here.
     local status = false
     local count = 0
     for _,host in pairs(hosts) do
         if M.get_host_status(host) then
-            local res = M.sync_object(host, bucket, object)
+            local res = M.sync_object(host, bucket, object, filename)
             if res then
                 ngx.log(ngx.NOTICE,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " succeeded.")
                 count = count + 1
@@ -566,12 +569,12 @@ function M.replicate_object(hosts, bucket, object)
             ngx.log(ngx.WARN,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " not initiated. The host is down.")
         end
     end
-    if count > (#hosts/2) then
+    if count >= (#hosts/2) then
         status = true
-        ngx.log(ngx.INFO,"Successfully replicated to " .. count .. " hosts. That is more than " .. #hosts/2)
+        ngx.log(ngx.INFO,"Successfully replicated to " .. count .. " hosts. That is more or equal than " .. #hosts/2)
     else
         status = false
-        ngx.log(ngx.ERR,"Managed to replicate to " .. count .. " hosts. That is not more replicas than " .. #hosts/2 .. ", so report the write as failed.")
+        ngx.log(ngx.ERR,"Managed to replicate to " .. count .. " hosts. That is less replicas than " .. #hosts/2 .. ", so report the write as failed.")
     end
     return status
 end
@@ -579,6 +582,16 @@ end
 function M.get_local_object_path(bucket, object)
     local dir = M.get_storage_directory()
     local path = nil
+
+    if not bucket then
+        ngx.log(ngx.ERR,"Bucket not set")
+        return nil
+    end
+
+    if not object then
+        ngx.log(ngx.ERR,"Object not set")
+        return nil
+    end
 
     if dir then
         local object_base64 = ngx.encode_base64(object)
@@ -612,6 +625,106 @@ function M.get_local_object_versions(bucket, object)
     end
     ngx.log(ngx.INFO,"Found " .. #versions .. " versions locally of " .. bucket .. "/" .. object)
     return versions
+end
+
+-- Function to fetch host status and update the cached status for all hosts
+-- found in the configuration.
+function M.update_status_for_all_hosts(sites)
+    sites = M.randomize_table(sites)
+    local port = M.get_bind_port()
+    local unavailable = {}
+    local total_hosts = 0
+    for i,site in ipairs(sites) do
+        local hosts = M.get_site_hosts(site)
+        hosts = M.randomize_table(hosts)
+        total_hosts = total_hosts + #hosts
+        for i,host in ipairs(hosts) do
+            local status = M.remote_host_availability(host, port)
+            -- Status is true or false to indicate if the host is
+            -- available or not.
+            M.update_host_status(host,status)
+
+            if not status then
+                table.insert(unavailable,host)
+            end
+        end
+    end
+
+    if #unavailable > 0 then
+        ngx.log(ngx.ERR,#unavailable .. " of the " .. total_hosts .. " hosts are unavailable: " .. tostring(unavailable))
+    end
+end
+
+-- Verify the checksum of the file. Return true if valid, false if corrupt.
+function M.is_checksum_valid(bucket, object, version, md5)
+    local path = M.get_local_object_path(bucket, object)
+    local f = path .. "/" .. version .. "-" .. md5 .. ".data"
+
+    local valid = false
+    --if M.is_file(f) then
+         -- Calculate checksum here
+         -- ngx.log(ngx.ERR,"Calculate checksum of " .. f)
+         -- local current_checksum = md5(f)
+         -- if current_checksum == md5 then
+         --     valid = true
+         -- else
+         --     valid = false
+         --     ngx.log(ngx.ERR,"File " .. f .. " is corrupt. Checksum mismatch")
+         -- end
+    --end
+
+    -- TODO: Remove when the checksum thing has been written.
+    valid = true
+    return valid
+end
+
+function M.full_replication()
+    local path = M.get_storage_directory()
+    local entry, versions, popen = nil, {}, io.popen
+    for entry in popen('find ' .. path .. ' -type f -printf "%T@\t%s\t%f\t%h\n" | sort -nr'):lines() do
+        local m, err = ngx.re.match(entry, "^([0-9]+)[^\t]+\t([0-9]+)\t([0-9]+)-([a-f0-9]+).([a-z]+)\t" .. path .. "/([^/]+).*/([^/]+)$","j")
+        if m then
+            if #m == 7 then
+                local mtime = tonumber(m[1])
+                local size = tonumber(m[2])
+                local version = tonumber(m[3])
+                local md5 = m[4]
+                local filetype = m[5]
+                local bucket = m[6]
+                local object_base64 = m[7]
+                local object = ngx.decode_base64(object_base64)
+                local filename = version .. "-" .. md5 .. "." .. filetype
+
+                -- ngx.log(ngx.ERR,"mtime: " .. m[1] .. ", size: " .. m[2] .. ", version: " .. m[3] .. ", md5: " .. m[4] .. ", type: " .. m[5] .. ", bucket: " .. m[6])
+
+                if filetype == "data" then
+                    local valid = M.is_checksum_valid(bucket, object, version, md5)
+                    if valid then
+                        -- Replicate to other hosts.
+                        local sites = M.get_object_replica_sites(bucket, object)
+                        local hosts = M.get_replica_hosts(bucket, object, sites)
+                        for _,host in pairs(hosts) do
+                            if M.get_host_status(host) then
+                                local res = M.sync_object(host, bucket, object, filename)
+                                if res then
+                                    ngx.log(ngx.INFO,"Object " .. bucket .. "/" .. object .. " version " .. version .. " was replicated to " .. host)
+                                else
+                                    ngx.log(ngx.ERR,"Object " .. bucket .. "/" .. object .. " version " .. version .. " was NOT replicated to " .. host)
+                                end
+                            else
+                                ngx.log(ngx.ERR,host .. " is down. Unable to replicate.")
+                            end
+                        end
+                    else
+                        ngx.log(ngx.ERR,"Object " .. bucket .. "/" .. object .. " version " .. version .. " is corrupt")
+                        -- M.quarantine(bucket, object, version, md5)
+                    end
+                -- elseif filetype == "ts" then
+                    -- Remove old versions if tombstone exists.
+                end
+            end
+        end
+    end
 end
     
 return M

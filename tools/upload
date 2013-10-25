@@ -1,0 +1,18 @@
+#!/bin/bash
+
+path=$1
+md5=$(md5sum $path | awk '{print $1}')
+
+echo $path
+echo $md5
+
+if [ -f "${path}" ]; then
+    #echo "Uploading $path..."
+    filename=$(basename $path)
+    #curl -i -L -H 'expect: 100-continue' --data-binary "@${path}" "http://tindeimport.i.bitbit.net/${filename}"
+    curl -s -i -L -H 'expect: 100-continue' -H "x-md5: $md5" --data-binary "@${path}" "http://localhost/${filename}?bucket=testbucket"
+else
+    echo "$path is not a file"
+fi
+
+

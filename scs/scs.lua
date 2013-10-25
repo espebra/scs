@@ -135,6 +135,10 @@ local function lookup_object(r)
 end
 
 local function post_object(r)
+    if not r['object_md5'] or not r['object'] or not r['bucket'] then
+        ngx.log(ngx.ERR,"Missing input data")
+        ngx.exit(ngx.HTTP_BAD_REQUEST)
+    end
     local internal = r['internal']
     local bucket = r['bucket']
     local object = r['object']
@@ -184,7 +188,7 @@ local function post_object(r)
         else
             ngx.log(ngx.INFO,'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system (' .. path .. '/' .. object_name_on_disk .. ')')
 
-            if common.replicate_object(hosts, bucket, object) then
+            if common.replicate_object(hosts, bucket, object, object_name_on_disk) then
                 exitcode = ngx.HTTP_OK
             end
         end
@@ -244,7 +248,7 @@ elseif method == "GET" or method == "HEAD" then
     -- elseif r['bucket'] and r['object'] then
     --     exitcode = lookup_object(r)
     -- end
-    exitcode = lookup_object(r)
+    exitcode, msg = lookup_object(r)
 end
 
 local elapsed = ngx.now() - ngx.req.start_time()

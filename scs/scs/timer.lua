@@ -17,22 +17,9 @@ function M.initiate_periodic_health_checks(delay)
             return
         end
 
+        local sites = common.get_all_sites()
         while true do
-            local port = common.get_bind_port()
-            local sites = common.get_all_sites()
-            sites = common.randomize_table(sites)
-            for i,site in ipairs(sites) do
-                --ngx.log(ngx.ERR,"Checking site " .. site)
-                local hosts = common.get_site_hosts(site)
-                hosts = common.randomize_table(hosts)
-                for i,host in ipairs(hosts) do
-                    --ngx.log(ngx.ERR,"Checking host " .. host .. " on site " .. site)
-                    local status=common.remote_host_availability(host, port)
-                    -- Status is true or false to indicate if the host is
-                    -- available or not.
-                    common.update_host_status(host,status)
-                end
-            end
+            common.update_status_for_all_hosts(sites)
             ngx.sleep(delay)
         end
         return
@@ -59,16 +46,25 @@ function M.initiate_batch_synchronization(delay)
             return
         end
 
+        local path = common.get_storage_directory()
+        if not common.is_file(path) then
+            ngx.log(ngx.ERR,"Unable to start the sync prosess!" .. path .. " does not exist")
+            return
+        end
+
         while true do
-            ngx.log(ngx.ERR, "Execute batch synchronization now!")
-            ngx.log(ngx.ERR, "Work start")
-            ngx.sleep(300)
-            ngx.log(ngx.ERR, "Work complete")
+            local start = ngx.time()
+            local versions = {}
+
+            ngx.log(ngx.ERR,"Batch job started")
+            common.full_replication()
+            local elapsed = ngx.now() - start
+            ngx.log(ngx.ERR,"Batch job completed in " .. elapsed .. " seconds.")
             ngx.sleep(delay)
         end
     end
 
-    local ok, err = ngx.timer.at(0, handler)
+    local ok, err = ngx.timer.at(5, handler)
     if not ok then
         ngx.log(ngx.ERR, "Failed to create the synchronization timer: " .. err)
         return
