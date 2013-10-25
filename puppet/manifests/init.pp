@@ -72,8 +72,8 @@ Exec {
 
 exec {
     'extract':
-        command     => "tar -xvzf ngx_openresty-${ngx_version}.tar.gz -C /tmp",
-        cwd         => '/vagrant',
+        command     => "tar -xvzf /ngx_openresty-${ngx_version}.tar.gz -C /tmp",
+        cwd         => '/vagrant/src',
         creates     => "/tmp/ngx_openresty-${ngx_version}",
         notify      => Exec['configure'];
     'configure':
