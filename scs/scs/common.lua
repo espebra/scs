@@ -477,6 +477,9 @@ function M.parse_request()
     if #object > 0 then
         object_base64 = ngx.encode_base64(object)
         object_name_md5 = ngx.md5(object)
+    else
+        -- Do not allow 0 character object names
+        object = nil
     end
 
     -- Make sure that the bucket name is valid

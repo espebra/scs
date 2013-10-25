@@ -94,7 +94,7 @@ local cjson = require 'cjson'
 
 local function lookup_object(r)
     local exitcode = ngx.HTTP_NOT_FOUND
-    local msg
+    local out = {}
     -- See if the object exists locally
     local object = r['object']
     local bucket = r['bucket']
@@ -109,29 +109,29 @@ local function lookup_object(r)
         local sites = common.get_object_replica_sites(bucket, object)
         local hosts = common.get_replica_hosts(bucket, object, sites)
 
-        -- Easier to understand what is happening when debugging
-        local hosts_text = "["
-        for _,host in pairs(hosts) do
-            hosts_text = hosts_text .. " " .. host
-        end
-        hosts_text = hosts_text .. " ]"
+        -- Print replica hosts for this object
+        out['hosts'] = hosts
 
         local host = common.get_host_with_object(hosts, bucket, object)
         if host == nil then
-            msg = "All the replica hosts for object " .. object .. " in bucket " .. bucket .. " are unavailable. Please try again later " .. hosts_text
+            out['message'] = "All the replica hosts for object " .. object .. " in bucket " .. bucket .. " are unavailable. Please try again later."
+            out['success'] = false
             exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
         elseif host == false then
-            msg = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts " .. hosts_text
+            out['message'] = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts."
+            out['success'] = false
             exitcode = ngx.HTTP_NOT_FOUND
         else
             local port = common.get_bind_port()
             local url = common.generate_url(host,port,object,bucket)
-            msg = 'Redirecting GET request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. " " .. hosts_text
+            out['message'] = 'Redirecting GET request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. "."
+            out['success'] = true
+
             ngx.header["Location"] = url
             exitcode = ngx.HTTP_MOVED_TEMPORARILY
         end
     end
-    return exitcode, msg
+    return exitcode, out
 end
 
 local function post_object(r)
@@ -234,6 +234,7 @@ local r = common.parse_request()
 --ngx.header["server"] = nil
 
 local exitcode = nil
+local out = {}
 
 local method = r['method']
 if method == "POST" then
@@ -248,7 +249,17 @@ elseif method == "GET" or method == "HEAD" then
     -- elseif r['bucket'] and r['object'] then
     --     exitcode = lookup_object(r)
     -- end
-    exitcode, msg = lookup_object(r)
+    if not r['bucket'] then
+        exitcode = 200
+        out['success'] = false
+        out['message'] = "Bucket not specified"
+    elseif not r['object'] then
+        exitcode = 200
+        out['success'] = true
+        out['message'] = "List bucket meta data"
+    else
+        exitcode, out = lookup_object(r)
+    end
 end
 
 local elapsed = ngx.now() - ngx.req.start_time()
@@ -258,8 +269,14 @@ if not ngx.headers_sent then
     end
 end
 
+-- The exit code should be set at this point
 if not exitcode then
    exitcode = 500
+end
+
+-- We have some output for the client
+if out then
+    ngx.say(cjson.encode(out))
 end
 
 ngx.exit(exitcode)
