@@ -433,96 +433,96 @@ function M.is_internal_request(useragent)
 end
 
 -- Populate the request table with sanitized input data
-function M.parse_request()
-    local h = ngx.req.get_headers()
-    local internal = M.is_internal_request(h['user-agent'])
-    local debug = h['x-debug']
-    local status = h['x-status']
-    local object_md5 = h['x-md5']
-
-    -- Check the md5 content
-    if object_md5 then
-        if not ngx.re.match(object_md5, '^[a-f0-9]+$','j') then
-            ngx.log(ngx.ERR,"Request md5 header contains non-valid characters")
-            object_md5 = nil
-        end
-
-        -- Check the md5 length
-        if not #object_md5 == 32 then
-            ngx.log(ngx.ERR,"Request md5 header length is invalid")
-            object_md5 = nil
-        end
-    end
-
-    local args = ngx.req.get_uri_args()
-
-    -- The bucket is the value of the argument bucket, or the hostname in the
-    -- host header.
-    local bucket = nil
-    if args['bucket'] then
-        bucket = args['bucket']
-    else
-        local m, err = ngx.re.match(ngx.var.host, '^([^.]+)','j')
-        if m then
-            if #m == 1 then
-                bucket = m[1] 
-            end
-        end
-    end
-
-    -- Read the object name, and remove the first char (which is a /)
-    local object = string.sub(ngx.var.uri, 2)
-
-    -- Unescape the filename of the object before hashing
-    object = ngx.unescape_uri(object)
-
-    -- Set both the object and object_base64 to nil if the length of the object
-    -- name is 0.
-    local object_base64 = nil
-    local object_name_md5 = nil
-    if #object > 0 then
-        object_base64 = ngx.encode_base64(object)
-        object_name_md5 = ngx.md5(object)
-    else
-        -- Do not allow 0 character object names
-        object = nil
-    end
-
-    -- Make sure that the bucket name is valid
-    if not M.verify_bucket(bucket) then
-        bucket = false
-    end
-
-    local r = {
-        -- Plain text name of the object
-        ['object'] = object,
-        -- The md5 checksum of the body, given by the client
-        ['object_md5'] = object_md5,
-        -- MD5 checksum of text name of the object
-        ['object_name_md5'] = object_name_md5,
-        -- Base64 name of the object
-        ['object_base64'] = object_base64,
-        -- Relative d/i/r/ectory to use in the file system
-        ['dir'] = M.get_directory_depth(object),
-        -- Request method (HEAD, GET, POST, ..)
-        ['method'] = ngx.var.request_method, 
-        -- Name of the bucket
-        ['bucket'] = bucket, 
-        -- True if the request is an internal scs request
-        ['internal'] = internal, 
-        -- Add debug information in the response
-        ['status'] = status, 
-        -- Add debug information in the response
-        ['debug'] = debug, 
-        ['prefix'] = M.get_parameter('prefix',args), 
-        ['max-keys'] = M.get_parameter('max-keys',args), 
-        ['marker'] = M.get_parameter('marker',args), 
-    }
-
-    -- Clean up
-    ngx.header['Server'] = 'scs'
-    return r
-end
+--function M.parse_request()
+--    local h = ngx.req.get_headers()
+--    local internal = M.is_internal_request(h['user-agent'])
+--    local debug = h['x-debug']
+--    local status = h['x-status']
+--    local object_md5 = h['x-md5']
+--
+--    -- Check the md5 content
+--    if object_md5 then
+--        if not ngx.re.match(object_md5, '^[a-f0-9]+$','j') then
+--            ngx.log(ngx.ERR,"Request md5 header contains non-valid characters")
+--            object_md5 = nil
+--        end
+--
+--        -- Check the md5 length
+--        if not #object_md5 == 32 then
+--            ngx.log(ngx.ERR,"Request md5 header length is invalid")
+--            object_md5 = nil
+--        end
+--    end
+--
+--    local args = ngx.req.get_uri_args()
+--
+--    -- The bucket is the value of the argument bucket, or the hostname in the
+--    -- host header.
+--    local bucket = nil
+--    if args['bucket'] then
+--        bucket = args['bucket']
+--    else
+--        local m, err = ngx.re.match(ngx.var.host, '^([^.]+)','j')
+--        if m then
+--            if #m == 1 then
+--                bucket = m[1] 
+--            end
+--        end
+--    end
+--
+--    -- Read the object name, and remove the first char (which is a /)
+--    local object = string.sub(ngx.var.uri, 2)
+--
+--    -- Unescape the filename of the object before hashing
+--    object = ngx.unescape_uri(object)
+--
+--    -- Set both the object and object_base64 to nil if the length of the object
+--    -- name is 0.
+--    local object_base64 = nil
+--    local object_name_md5 = nil
+--    if #object > 0 then
+--        object_base64 = ngx.encode_base64(object)
+--        object_name_md5 = ngx.md5(object)
+--    else
+--        -- Do not allow 0 character object names
+--        object = nil
+--    end
+--
+--    -- Make sure that the bucket name is valid
+--    if not M.verify_bucket(bucket) then
+--        bucket = false
+--    end
+--
+--    local r = {
+--        -- Plain text name of the object
+--        ['object'] = object,
+--        -- The md5 checksum of the body, given by the client
+--        ['object_md5'] = object_md5,
+--        -- MD5 checksum of text name of the object
+--        ['object_name_md5'] = object_name_md5,
+--        -- Base64 name of the object
+--        ['object_base64'] = object_base64,
+--        -- Relative d/i/r/ectory to use in the file system
+--        ['dir'] = M.get_directory_depth(object),
+--        -- Request method (HEAD, GET, POST, ..)
+--        ['method'] = ngx.var.request_method, 
+--        -- Name of the bucket
+--        ['bucket'] = bucket, 
+--        -- True if the request is an internal scs request
+--        ['internal'] = internal, 
+--        -- Add debug information in the response
+--        ['status'] = status, 
+--        -- Add debug information in the response
+--        ['debug'] = debug, 
+--        ['prefix'] = M.get_parameter('prefix',args), 
+--        ['max-keys'] = M.get_parameter('max-keys',args), 
+--        ['marker'] = M.get_parameter('marker',args), 
+--    }
+--
+--    -- Clean up
+--    ngx.header['Server'] = 'scs'
+--    return r
+--end
 
 -- Given a directory, return a table with information about each file in that
 -- directory - recusively and sorted by mtime.

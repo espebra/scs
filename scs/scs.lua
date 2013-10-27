@@ -1,4 +1,5 @@
 local common = require "scs.common"
+local Request = require "scs.request"
 local timer = require "scs.timer"
 
 --local http = require "libs.resty.http.simple"
@@ -230,30 +231,34 @@ local function delete_object(internal, bucket, object)
     return exitcode
 end
 
-local r = common.parse_request()
+local r = Request()
+local method = r.method
+
+--local r = common.parse_request()
+--local method = r['method']
+
 --ngx.header["server"] = nil
 
 local exitcode = nil
 local out = {}
 
-local method = r['method']
 if method == "POST" then
     exitcode = post_object(r)
 elseif method == "PUT" then
-    exitcode = put_object(r['internal'], r['bucket'], r['object'])
+    exitcode = put_object(r.internal, r.bucket, r.object)
 elseif method == "DELETE" then
-    exitcode = delete_object(r['internal'], r['bucket'], r['object'])
+    exitcode = delete_object(r.internal, r.bucket, r.object)
 elseif method == "GET" or method == "HEAD" then
     -- if r['bucket'] and not r['object'] then
     --     exitcode = bucket_index(r)
     -- elseif r['bucket'] and r['object'] then
     --     exitcode = lookup_object(r)
     -- end
-    if not r['bucket'] then
+    if not r.bucket then
         exitcode = 200
         out['success'] = false
         out['message'] = "Bucket not specified"
-    elseif not r['object'] then
+    elseif not r.object then
         exitcode = 200
         out['success'] = true
         out['message'] = "List bucket meta data"
@@ -271,12 +276,14 @@ end
 
 -- The exit code should be set at this point
 if not exitcode then
-   exitcode = 500
+    exitcode = 500
 end
 
 -- We have some output for the client
-if out then
-    ngx.say(cjson.encode(out))
+if exitcode == 200 then
+    if out then
+        ngx.say(cjson.encode(out))
+    end
 end
 
 ngx.exit(exitcode)

@@ -2,7 +2,7 @@ $ngx_version = '1.4.2.9'
 
 # Install some packages 
 $packages = [ 'git', 'rsync', 'python-devel', 'openssl-devel', 'pcre-devel',
-              'gcc', 'xinetd' ]
+              'gcc', 'xinetd', 'perl-libwww-perl' ]
 
 package {
     $packages: ensure => installed;
@@ -61,7 +61,7 @@ file {
         notify  => Service["xinetd"];
     '/etc/init.d/scs':
         ensure  => link,
-        source  => '/vagrant/scs/conf/scs.init.example',
+        source  => '/vagrant/scs/conf/scs.init',
         notify  => Service["scs"];
     '/etc/scs/scs.conf':
         ensure  => link,
