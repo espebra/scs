@@ -22,6 +22,8 @@ local function rewrite_request(r)
             ngx.req.set_uri(uri, true)
         end
     end
+
+    -- None found
 end
 
 -- Read the request
