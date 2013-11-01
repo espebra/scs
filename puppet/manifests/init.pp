@@ -75,7 +75,7 @@ file {
         ensure  => link,
         source  => '/vagrant/scs/conf/scs.conf',
         notify  => Service['scs'];
-    '/usr/local/bin/p':
+    '/usr/local/sbin/p':
         source  => '/vagrant/puppet/files/puppet/p',
         mode    => 555;
 }
