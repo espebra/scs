@@ -90,22 +90,26 @@ Exec {
 exec {
     'extract':
         command     => "tar -xvzf ngx_openresty-${ngx_version}.tar.gz -C /tmp",
+        timeout     => 0,
         cwd         => '/vagrant/src',
         creates     => "/tmp/ngx_openresty-${ngx_version}",
         notify      => Exec['configure'];
     'configure':
         command   => 'configure --with-luajit --with-pcre-jit --prefix=/usr/local/openresty --with-ipv6 --error-log-path=/var/log/scs/error.log --http-log-path=/var/log/scs/access.log --http-client-body-temp-path=/var/cache/scs/',
+        timeout     => 0,
         path      => [ '/bin/', '/sbin/', '/usr/bin/', '/usr/sbin/', "/tmp/ngx_openresty-${ngx_version}" ],
         cwd       => "/tmp/ngx_openresty-${ngx_version}",
         refreshonly => true,
         notify    => Exec['make'];
     'make':
         command   => 'gmake',
+        timeout     => 0,
         cwd       => "/tmp/ngx_openresty-${ngx_version}",
         refreshonly => true,
         notify    => Exec['install'];
     'install':
         command   => 'gmake install',
+        timeout     => 0,
         refreshonly => true,
         cwd       => "/tmp/ngx_openresty-${ngx_version}";
 }
@@ -123,3 +127,11 @@ service {
         hasrestart => true,
         enable     => true;
 }
+
+cron {
+    'puppet':
+        command => '/usr/local/sbin/p',
+        user    => 'root',
+        minute  => [0, 15, 30, 45];
+}
+
