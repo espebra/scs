@@ -8,8 +8,9 @@
 export PATH="$PATH:/usr/local/openresty/nginx/sbin"
 export LD_LIBRARY_PATH="/usr/local/openresty/luajit/lib/:$LD_LIBRARY_PATH"
 export LD_LIBRARY_PATH="/usr/local/openresty/lualib/:$LD_LIBRARY_PATH"
+export LUA_PATH="/srv/scs/lib/?.lua;/srv/scs/?.lua"
 
-cd /srv/scs
+cd /var/cache/scs
 
 start() {
         echo "Starting"

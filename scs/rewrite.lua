@@ -1,6 +1,6 @@
-local common = require "scs.common"
-local Request = require "scs.request"
-local timer = require "scs.timer"
+local common = require "common"
+local Request = require "request"
+local timer = require "timer"
 local cjson = require 'cjson'
 
 local function rewrite_request(r)

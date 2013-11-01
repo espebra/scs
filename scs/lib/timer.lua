@@ -1,6 +1,6 @@
 local M = {}
 
-local common = require "scs.common"
+local common = require "common"
 local ngx = ngx
 
 function M.initiate_periodic_health_checks(delay)

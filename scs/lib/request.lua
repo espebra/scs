@@ -1,4 +1,4 @@
-local class = require "scs.kidclass"
+local class = require "kidclass"
 local Request = class.new();
 local ngx = ngx
 

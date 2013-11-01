@@ -1,6 +1,6 @@
-local common = require "scs.common"
-local Request = require "scs.request"
-local timer = require "scs.timer"
+local common = require "common"
+local Request = require "request"
+local timer = require "timer"
 
 --local http = require "libs.resty.http.simple"
 --local Flexihash = require 'libs.Flexihash'
