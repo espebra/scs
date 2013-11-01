@@ -136,15 +136,16 @@ local function lookup_object(r)
 end
 
 local function post_object(r)
-    if not r['object_md5'] or not r['object'] or not r['bucket'] then
+    local out = {}
+    if not r.object_md5 or not r.object or not r.bucket then
         ngx.log(ngx.ERR,"Missing input data")
         ngx.exit(ngx.HTTP_BAD_REQUEST)
     end
-    local internal = r['internal']
-    local bucket = r['bucket']
-    local object = r['object']
-    local object_base64 = r['object_base64']
-    local object_name_on_disk = ngx.time() .. "-" .. r['object_md5'] .. ".data"
+    local internal = r.internal
+    local bucket = r.bucket
+    local object = r.object
+    local object_base64 = r.object_base64
+    local object_name_on_disk = ngx.time() .. "-" .. r.object_md5 .. ".data"
 
     local sites = common.get_object_replica_sites(bucket, object)
     local hosts = common.get_replica_hosts(bucket, object, sites)
@@ -161,12 +162,14 @@ local function post_object(r)
         local req_body_file = ngx.req.get_body_file()
 
         if not req_body_file then
-            ngx.log(ngx.ERR,'No file found in request')
+            out['message'] = 'No file found in request'
+            out['success'] = false
             exitcode = ngx.HTTP_BAD_REQUEST
         end
 
         if req_body_file == nil then
-            ngx.log(ngx.ERR,'Request body is nil')
+            out['message'] = 'Request body is nil'
+            out['success'] = false
             exitcode = ngx.HTTP_BAD_REQUEST
         end
 
@@ -186,14 +189,18 @@ local function post_object(r)
 
         if not common.is_file(path .. "/" .. object_name_on_disk) then
             ngx.log(ngx.ERR,'Failed to write object ' .. object .. ' in bucket ' .. bucket .. ' to local file system (' .. path .. '/' .. object_name_on_disk .. ')')
+            out['message'] = 'Failed to write object'
+            out['success'] = false
         else
-            ngx.log(ngx.INFO,'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system (' .. path .. '/' .. object_name_on_disk .. ')')
+            out['message'] = 'The object was uploaded'
+            out['success'] = true
 
-            if common.replicate_object(hosts, bucket, object, object_name_on_disk) then
-                exitcode = ngx.HTTP_OK
-            end
+            ngx.log(ngx.INFO,'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system (' .. path .. '/' .. object_name_on_disk .. ')')
+            exitcode = ngx.HTTP_OK
         end
     else
+        out['hosts'] = hosts
+
         local host = nil
         local hosts_text = "["
         for _,h in pairs(hosts) do
@@ -205,6 +212,8 @@ local function post_object(r)
         hosts_text = hosts_text .. " ]"
 
         if host == nil then
+            out['success'] = false
+            out['message'] = 'None of the hosts are available at the moment. Please try again later.'
             ngx.log(ngx.WARN,'None of the hosts for object ' .. object .. ' in bucket ' .. bucket .. ' are available at the moment ' .. hosts_text)
             exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
         else
@@ -216,7 +225,7 @@ local function post_object(r)
             exitcode = 307
         end
     end
-    return exitcode
+    return exitcode, out
 end
 
 local function put_object(internal, bucket, object, req_body_file)
@@ -243,7 +252,7 @@ local exitcode = nil
 local out = {}
 
 if method == "POST" then
-    exitcode = post_object(r)
+    exitcode, out = post_object(r)
 elseif method == "PUT" then
     exitcode = put_object(r.internal, r.bucket, r.object)
 elseif method == "DELETE" then
