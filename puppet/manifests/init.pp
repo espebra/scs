@@ -91,7 +91,7 @@ exec {
         creates     => "/tmp/ngx_openresty-${ngx_version}",
         notify      => Exec['configure'];
     'configure':
-        command   => 'configure --with-luajit --with-pcre-jit --prefix=/usr/local/openresty --with-ipv6 --error-log-path=/var/log/scs/error.log --http-log-path=/var/log/scs/access.log',
+        command   => 'configure --with-luajit --with-pcre-jit --prefix=/usr/local/openresty --with-ipv6 --error-log-path=/var/log/scs/error.log --http-log-path=/var/log/scs/access.log --http-client-body-temp-path=/var/cache/scs/',
         path      => [ '/bin/', '/sbin/', '/usr/bin/', '/usr/sbin/', "/tmp/ngx_openresty-${ngx_version}" ],
         cwd       => "/tmp/ngx_openresty-${ngx_version}",
         refreshonly => true,
