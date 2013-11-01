@@ -14,6 +14,9 @@ cd /srv/scs
 start() {
         echo "Starting"
         nohup nginx -p /srv/scs/ -c /srv/scs/conf/nginx.conf > /var/log/scs/nohub.log
+
+        # To get the timers started
+        GET http://localhost/ 2>&1 > /dev/null
         return
 }
 
