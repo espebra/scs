@@ -154,7 +154,7 @@ local function post_object(r)
     if common.object_fits_on_this_host(hosts) then
         local path = common.get_local_object_path(bucket, object)
         if not os.rename(path, path) then
-            os.execute('mkdir -p ' .. path)
+            os.execute('mkdir --mode=0755 --parents ' .. path)
         end
 
         ngx.req.read_body()
