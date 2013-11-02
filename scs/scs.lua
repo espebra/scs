@@ -101,7 +101,6 @@ local function lookup_object(r)
     local bucket = r['bucket']
     local object_base64 = r['object_base64']
     local internal = r['internal']
-    local dir = common.get_storage_directory()
 
     -- The object do not exist locally
     if not internal then
@@ -131,6 +130,64 @@ local function lookup_object(r)
             ngx.header["Location"] = url
             exitcode = ngx.HTTP_MOVED_TEMPORARILY
         end
+    end
+    return exitcode, out
+end
+
+local function lookup_bucket(r)
+    local exitcode = ngx.HTTP_NOT_FOUND
+    local out = {}
+    -- See if the object exists locally
+    local bucket = r.bucket
+    local internal = r.internal
+    local dir = common.get_storage_directory()
+
+    if not internal then
+        -- Send request to all hosts
+        local method = "GET"
+        local path = "/?bucket=" .. bucket
+        local headers = {}
+        local timeout = 1000
+        local port = common.get_bind_port()
+        headers['user-agent'] = "scs internal"
+
+        local sites = common.get_all_sites()
+        local replicas = 0
+        local size = 0
+        for i,site in ipairs(sites) do
+            local hosts = common.get_site_hosts(site)
+            hosts = common.randomize_table(hosts)
+            for i,host in ipairs(hosts) do
+                local res, body = common.http_request(host, port, headers, method, path, timeout)
+                if res and body then
+                    local objects = cjson.decode(body)
+                    replicas = replicas + #objects
+
+                    for i,o in ipairs(objects) do
+                        size = size + o['size']
+                    end
+                end
+            end
+        end
+        out['bucket'] = bucket
+        out['replicas'] = replicas
+        out['bytes'] = size
+        exitcode = ngx.HTTP_OK
+    else
+        -- Read information about the bucket
+        local objects, counters = common.scandir(bucket)
+        out = objects
+        --out = {}
+        --out = counters
+
+        --for i,entry in pairs(entries) do
+        --    --out['foo'] = 'bar'
+        --    --table.insert(out, "i: " .. i .. ", value: " .. value)
+        --    --for k,value in pairs(entry) do
+        --    --    table.insert(out, "k: " .. k .. ", value: " .. value)
+        --    --end
+        --end
+        exitcode = ngx.HTTP_OK
     end
     return exitcode, out
 end
@@ -268,9 +325,7 @@ elseif method == "GET" or method == "HEAD" then
         out['success'] = false
         out['message'] = "Bucket not specified"
     elseif not r.object then
-        exitcode = 200
-        out['success'] = true
-        out['message'] = "List bucket meta data"
+        exitcode, out = lookup_bucket(r)
     else
         exitcode, out = lookup_object(r)
     end

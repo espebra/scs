@@ -291,19 +291,19 @@ function M.look_up_hash_map(hash, hash_map, replicas)
     return result
 end
 
-function M.sync_object(host, bucket, object, filename)
-    local dir = M.get_storage_directory()
-    local object_base64 = ngx.encode_base64(object)
-    local depth = M.get_directory_depth(object)
-    
-    local cmd="cd " .. dir .. " && /usr/bin/rsync -RzSut " .. bucket .. "/" .. depth .. "/" .. object_base64 .. "/" .. filename .. " rsync://" .. host .. "/scs"
-    local res = os.execute(cmd)
-    if res == 0 then
-        return true
-    else
-        return false
-    end
-end
+-- function M.sync_object(host, bucket, object, filename)
+--     local dir = M.get_storage_directory()
+--     local object_base64 = ngx.encode_base64(object)
+--     local depth = M.get_directory_depth(object)
+--     
+--     local cmd="cd " .. dir .. " && /usr/bin/rsync -RzSut " .. bucket .. "/" .. depth .. "/" .. object_base64 .. "/" .. filename .. " rsync://" .. host .. "/scs"
+--     local res = os.execute(cmd)
+--     if res == 0 then
+--         return true
+--     else
+--         return false
+--     end
+-- end
 
 -- Return a table with the hosts at a specific site  where a given object fits
 -- according to the hash ring.
@@ -526,67 +526,78 @@ end
 
 -- Given a directory, return a table with information about each file in that
 -- directory - recusively and sorted by mtime.
--- function M.scandir(bucket)
---     -- If the directory does not exist, return an empty table here
---     local dir = M.get_storage_directory()
---     local path = dir
--- 
---     if bucket then
---         path = dir .. "/" .. bucket
---     end
--- 
---     if not M.is_file(path) then
---         return {}
---     end
--- 
---     local entry, objects, popen = nil, {}, io.popen
---     local counter = 0
---     for entry in popen('find ' .. path .. ' -type f -printf "%T@\t%s\t%f\t%h\n" | sort -nr'):lines() do
---         local m, err = ngx.re.match(entry, "^([0-9]+)[^\t]+\t([^\t]+)\t([^\t]+)\t" .. dir .. "/([^/]+).*$","j")
---         if m then
---             if #m == 4 then
---                 local n = {}
---                 n['mtime'] = tonumber(m[1])
---                 n['LastModified'] = ngx.http_time(m[1])
---                 n['size'] = tonumber(m[2])
---                 local object = ngx.decode_base64(m[3])
--- 
---                 if n['mtime'] and bucket == m[4] then
---                     objects[object] = n
---                 end
---             end
---         end
---     end
---     --ngx.log(ngx.ERR,"Scanned the directory " .. path .. " and found " .. #objects .. " objects.")
---     return objects
--- end
+function M.scandir(bucket)
+    -- If the directory does not exist, return an empty table here
+    local dir = M.get_storage_directory()
+    local path = dir
 
-function M.replicate_object(hosts, bucket, object, filename)
-    -- Replicate the object to other hosts here.
-    local status = false
-    local count = 0
-    for _,host in pairs(hosts) do
-        if M.get_host_status(host) then
-            local res = M.sync_object(host, bucket, object, filename)
-            if res then
-                ngx.log(ngx.NOTICE,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " succeeded.")
-                count = count + 1
-            else
-                ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " failed.")
+    if bucket then
+        path = dir .. "/" .. bucket
+    end
+
+    if not M.is_file(path) then
+        return {}
+    end
+
+    local entry, objects, popen = nil, {}, io.popen
+    local counters = {}
+
+    counters['data'] = 0
+    counters['ts'] = 0
+    counters['prop'] = 0
+
+    for entry in popen('find ' .. path .. ' -type f -printf "%f\t%s\t%h\n"'):lines() do
+        --local m, err = ngx.re.match(entry, "^([^\t]+)\t([0-9]+)\t([^-]+)-([a-z][0-9]+)\.([a-z]+)\t" .. dir .. "/([^/]+).*$","j")
+        local m, err = ngx.re.match(entry, "^([0-9]+)-([a-f0-9]+).([a-z]+)\t([0-9]+)\t" .. dir .. "/" .. bucket .. "/[a-f0-9]+/[a-f0-9]+/(.*)$","j")
+        if m then
+            if #m == 5 then
+                local n = {}
+                n['mtime'] = tonumber(m[1])
+                --n['LastModified'] = ngx.http_time(m[1])
+                n['checksum'] = m[2]
+                n['size'] = tonumber(m[4])
+                n['object'] = ngx.decode_base64(m[5])
+
+                local t = m[3]
+                n['type'] = t
+
+                -- Count file type
+                counters[t] = counters[t] + 1
+
+                table.insert(objects, n)
             end
-        else
-            ngx.log(ngx.WARN,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " not initiated. The host is down.")
         end
     end
-    if count >= (#hosts/2) then
-        status = true
-        ngx.log(ngx.INFO,"Successfully replicated to " .. count .. " hosts. That is more or equal than " .. #hosts/2)
-    else
-        status = false
-        ngx.log(ngx.ERR,"Managed to replicate to " .. count .. " hosts. That is less replicas than " .. #hosts/2 .. ", so report the write as failed.")
-    end
-    return status
+    ngx.log(ngx.ERR,"Scanned the directory " .. path .. " and found " .. #objects .. " objects.")
+    return objects, counters
 end
+
+-- function M.replicate_object(hosts, bucket, object, filename)
+--     -- Replicate the object to other hosts here.
+--     local status = false
+--     local count = 0
+--     for _,host in pairs(hosts) do
+--         if M.get_host_status(host) then
+--             local res = M.sync_object(host, bucket, object, filename)
+--             if res then
+--                 ngx.log(ngx.NOTICE,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " succeeded.")
+--                 count = count + 1
+--             else
+--                 ngx.log(ngx.ERR,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " failed.")
+--             end
+--         else
+--             ngx.log(ngx.WARN,"Sync " .. bucket .. "/" .. object .. " to " .. host .. " not initiated. The host is down.")
+--         end
+--     end
+--     if count >= (#hosts/2) then
+--         status = true
+--         ngx.log(ngx.INFO,"Successfully replicated to " .. count .. " hosts. That is more or equal than " .. #hosts/2)
+--     else
+--         status = false
+--         ngx.log(ngx.ERR,"Managed to replicate to " .. count .. " hosts. That is less replicas than " .. #hosts/2 .. ", so report the write as failed.")
+--     end
+--     return status
+-- end
 
 function M.get_local_object_path(bucket, object)
     local dir = M.get_storage_directory()
@@ -735,5 +746,31 @@ function M.full_replication()
         end
     end
 end
+
+-- Lua implementation of PHP scandir function
+-- function M.scandir(directory)
+--     local i, t, popen = 0, {}, io.popen
+--     -- for filename in popen('ls "'..directory..'"'):lines() do
+--     for entry in popen('find ' .. directory .. ' -type f -printf "%T@\t%P\n" | sort -nr'):lines() do
+--         -- print(entry)
+--         local n = {}
+--         local m, err = ngx.re.match(entry,'^([^\t]+)\t([^/]+)/(.*)', 'j')
+--         if m then
+--             if #m == 3 then
+--                 n['epoch'] = m[1]
+--                 n['bucket'] = m[2]
+--                 n['object_base64'] = m[3]
+-- 
+--                 n['object'] = ngx.decode_base64(n['object_base64'])
+-- 
+--                 if M.verify_bucket(n['bucket']) then
+--                     i = i + 1
+--                     t[i] = n
+--                 end
+--             end
+--         end
+--     end
+--     return t
+-- end
     
 return M
