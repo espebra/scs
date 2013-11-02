@@ -152,7 +152,7 @@ local function lookup_bucket(r)
         headers['user-agent'] = "scs internal"
 
         local sites = common.get_all_sites()
-        local replicas = 0
+        local entries = 0
         local size = 0
         for i,site in ipairs(sites) do
             local hosts = common.get_site_hosts(site)
@@ -160,17 +160,17 @@ local function lookup_bucket(r)
             for i,host in ipairs(hosts) do
                 local res, body = common.http_request(host, port, headers, method, path, timeout)
                 if res and body then
-                    local objects = cjson.decode(body)
-                    replicas = replicas + #objects
+                    local e = cjson.decode(body)
+                    entries = entries + #e
 
-                    for i,o in ipairs(objects) do
+                    for i,o in ipairs(e) do
                         size = size + o['size']
                     end
                 end
             end
         end
         out['bucket'] = bucket
-        out['replicas'] = replicas
+        out['entries'] = entries
         out['bytes'] = size
         exitcode = ngx.HTTP_OK
     else

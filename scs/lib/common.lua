@@ -568,7 +568,7 @@ function M.scandir(bucket)
             end
         end
     end
-    ngx.log(ngx.ERR,"Scanned the directory " .. path .. " and found " .. #objects .. " objects.")
+    -- ngx.log(ngx.ERR,"Scanned the directory " .. path .. " and found " .. #objects .. " objects.")
     return objects, counters
 end
 
