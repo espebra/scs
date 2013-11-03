@@ -251,6 +251,10 @@ local function post_object(r)
         else
             out['message'] = 'The object was uploaded'
             out['success'] = true
+            out['object'] = object
+            out['bucket'] = bucket
+            out['md5'] = r.object_md5
+            out['hosts'] = hosts
 
             ngx.log(ngx.INFO,'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system (' .. path .. '/' .. object_name_on_disk .. ')')
             exitcode = ngx.HTTP_OK
