@@ -629,15 +629,14 @@ function M.get_local_object_versions(bucket, object)
 
     local entry, versions, popen = nil, {}, io.popen
     if M.is_file(path) then
-        for entry in popen('find ' .. path .. ' -type f -printf "%T@\t%s\t%f\n" | sort -nr'):lines() do
-            local m, err = ngx.re.match(entry, "^([0-9]+)[^\t]+\t([0-9]+)\t([0-9]+)-([a-f0-9]+).data$","j")
+        for entry in popen('find ' .. path .. ' -type f -printf "%s\t%f\n" | sort -nr'):lines() do
+            local m, err = ngx.re.match(entry, "^([0-9]+)\t([0-9]+)-([a-f0-9]+).data$","j")
             if m then
-                if #m == 4 then
+                if #m == 3 then
                     local n = {}
-                    n['mtime'] = tonumber(m[1])
-                    n['size'] = tonumber(m[2])
-                    n['version'] = tonumber(m[3])
-                    n['md5'] = m[4]
+                    n['size'] = tonumber(m[1])
+                    n['version'] = tonumber(m[2])
+                    n['md5'] = m[3]
                     table.insert(versions, n)
                 end
             end

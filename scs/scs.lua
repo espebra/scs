@@ -101,6 +101,7 @@ local function lookup_object(r)
     local bucket = r.bucket
     local object_base64 = r.object_base64
     local internal = r.internal
+    local meta = r.meta
 
     -- The object do not exist locally
     if not internal then
@@ -121,7 +122,8 @@ local function lookup_object(r)
             out['message'] = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts."
             out['success'] = false
             exitcode = ngx.HTTP_NOT_FOUND
-        else
+        elseif not meta then
+            -- Rewrite to correct node
             local port = common.get_bind_port()
             local url = common.generate_url(host,port,object,bucket)
             out['message'] = 'Redirecting GET request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. "."
@@ -129,7 +131,38 @@ local function lookup_object(r)
 
             ngx.header["Location"] = url
             exitcode = ngx.HTTP_MOVED_TEMPORARILY
+        else
+            -- Print meta data about the object
+            local port = common.get_bind_port()
+            local url = common.generate_url(host,port,object,bucket)
+            out['message'] = 'The object was found'
+            out['object'] = object
+            out['sites'] = sites
+            out['bucket'] = bucket
+
+            local method = "GET"
+            local path = "/" .. object .. "?bucket=" .. bucket
+            local headers = {}
+            local timeout = 1000
+            local port = common.get_bind_port()
+            headers['user-agent'] = "scs internal"
+            headers['x-meta'] = "true"
+
+            for i,host in ipairs(hosts) do
+                local res, body = common.http_request(host, port, headers, method, path, timeout)
+                if res and body then
+                    local e = cjson.decode(body)
+                    out[host] = e
+                end
+            end
+
+            exitcode = ngx.HTTP_OK
         end
+    else
+        -- Get the local versions of a object
+        local versions = common.get_local_object_versions(bucket, object)
+        out['versions'] = versions
+        exitcode = ngx.HTTP_OK
     end
     return exitcode, out
 end
@@ -351,6 +384,7 @@ end
 -- We have some output for the client
 if exitcode == 200 then
     if out then
+        ngx.header["content-type"] = "application/json"
         ngx.say(cjson.encode(out))
     end
 end

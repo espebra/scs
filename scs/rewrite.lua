@@ -41,7 +41,7 @@ end
 local method = r.method
 if method == "GET" or method == "HEAD" then
     -- Only if a object name is set
-    if r.object then
+    if r.object and not r.meta then
         rewrite_request(r)
     end
 end

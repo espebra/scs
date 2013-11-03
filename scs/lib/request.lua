@@ -78,8 +78,10 @@ function Request.Constructor(self)
         self.internal = _is_internal(h['user-agent'])
     end
 
-    if h['x-debug'] then
-        self.debug = h['x-debug']
+    if h['x-meta'] then
+        self.meta = true
+    elseif args['x-meta'] then
+        self.meta = true
     end
 
     if h['x-status'] then
