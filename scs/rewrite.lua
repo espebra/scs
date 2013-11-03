@@ -16,8 +16,9 @@ local function rewrite_request(r)
         if #versions > 0 then
             -- Print the checksum as a response header
             ngx.header['X-Md5'] = versions[1].md5
+            local depth = common.get_directory_depth(object)
 
-            local uri = "/" .. bucket .. "/" .. dir .. "/" .. object_base64 .. "/" .. versions[1].version .. "-" .. versions[1].md5 .. ".data"
+            local uri = "/" .. bucket .. "/" .. depth .. "/" .. object_base64 .. "/" .. versions[1].version .. "-" .. versions[1].md5 .. ".data"
             ngx.log(ngx.INFO,"Found " .. bucket .. "/" .. object .. " in local file system. Rewriting URI " .. ngx.var.uri .. " to " .. uri)
             ngx.req.set_uri(uri, true)
         end

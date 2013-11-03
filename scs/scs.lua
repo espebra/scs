@@ -97,10 +97,10 @@ local function lookup_object(r)
     local exitcode = ngx.HTTP_NOT_FOUND
     local out = {}
     -- See if the object exists locally
-    local object = r['object']
-    local bucket = r['bucket']
-    local object_base64 = r['object_base64']
-    local internal = r['internal']
+    local object = r.object
+    local bucket = r.bucket
+    local object_base64 = r.object_base64
+    local internal = r.internal
 
     -- The object do not exist locally
     if not internal then
