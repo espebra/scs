@@ -135,7 +135,8 @@ local function lookup_object(r)
             -- Print meta data about the object
             local port = common.get_bind_port()
             local url = common.generate_url(host,port,object,bucket)
-            out['message'] = 'The object was found'
+            out['message'] = 'The object was not found'
+            out['success'] = false
             out['object'] = object
             out['sites'] = sites
             out['bucket'] = bucket
@@ -153,6 +154,11 @@ local function lookup_object(r)
                 if res and body then
                     local e = cjson.decode(body)
                     out[host] = e
+
+                    if #e['versions'] > 0 then
+                        out['message'] = 'The object was found'
+                        out['success'] = true
+                    end
                 end
             end
 
