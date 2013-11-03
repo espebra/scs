@@ -161,7 +161,7 @@ local function lookup_object(r)
     else
         -- Get the local versions of a object
         local versions = common.get_local_object_versions(bucket, object)
-        out = versions
+        out['versions'] = versions
         exitcode = ngx.HTTP_OK
     end
     return exitcode, out
