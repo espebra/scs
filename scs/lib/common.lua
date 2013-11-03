@@ -44,22 +44,26 @@ function M.update_host_status(host, status)
     local s = ngx.shared.status
 
     local previous_status = s:get(host)
-    if not previous_status == status then
+
+    if previous_status == status then
+        -- no change
+        return true
+    else
         if status then
             ngx.log(ngx.ERR,"Host " .. host .. " is now up!")
         else
             ngx.log(ngx.ERR,"Host " .. host .. " is now unavailable!")
         end
-    end
+    
+        local success, err, forcible
+        success, err, forcible = s:set(host, status)
 
-    local success, err, forcible
-    success, err, forcible = s:set(host, true)
-
-    if success then
-        return true
-    else
-        ngx.log(ngx.ERR,"Failed to cache status for host " .. host .. ": " .. err)
-        return false
+        if success then
+            return true
+        else
+            ngx.log(ngx.ERR,"Failed to cache status for host " .. host .. ": " .. err)
+            return false
+        end
     end
 end
 
