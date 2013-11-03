@@ -260,6 +260,7 @@ local function post_object(r)
             exitcode = ngx.HTTP_OK
         end
     else
+        hosts = common.randomize_table(hosts)
         out['hosts'] = hosts
 
         local host = nil
