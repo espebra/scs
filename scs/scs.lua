@@ -102,6 +102,11 @@ local function lookup_object(r)
     local object_base64 = r.object_base64
     local internal = r.internal
     local meta = r.meta
+    --local debug = r.debug
+
+    --if debug then
+    --    ngx.log(ngx.ERR,"Object: " .. object .. ", bucket: " .. bucket)
+    --end
 
     -- The object do not exist locally
     if not internal then
@@ -118,6 +123,9 @@ local function lookup_object(r)
             out['message'] = "All the replica hosts for object " .. object .. " in bucket " .. bucket .. " are unavailable. Please try again later."
             out['success'] = false
             exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
+        elseif host == false then
+            out['message'] = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts."
+            out['success'] = false
         elseif host == false then
             out['message'] = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts."
             out['success'] = false
@@ -170,6 +178,11 @@ local function lookup_object(r)
         out['versions'] = versions
         exitcode = ngx.HTTP_OK
     end
+
+    --if debug then
+    --    ngx.log(ngx.ERR, out['message'])
+    --end
+
     return exitcode, out
 end
 
@@ -235,7 +248,7 @@ local function post_object(r)
     local out = {}
     if not r.object_md5 or not r.object or not r.bucket then
         ngx.log(ngx.ERR,"Missing input data")
-        ngx.exit(ngx.HTTP_BAD_REQUEST)
+        return ngx.exit(ngx.HTTP_BAD_REQUEST)
     end
     local internal = r.internal
     local bucket = r.bucket
@@ -387,13 +400,12 @@ if not exitcode then
     exitcode = 500
 end
 
--- We have some output for the client
-if exitcode == 200 then
-    if out then
-        ngx.header["content-type"] = "application/json"
-        ngx.say(cjson.encode(out))
-    end
-end
+-- Send the exit code to nginx
+ngx.status = exitcode
 
-ngx.exit(exitcode)
+-- We have some output for the client
+if out then
+    ngx.header["content-type"] = "application/json"
+    ngx.say(cjson.encode(out))
+end
 
