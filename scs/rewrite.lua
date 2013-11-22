@@ -31,11 +31,11 @@ end
 local r = Request()
 
 -- Start periodic batch jobs here
-timer.initiate_periodic_health_checks(10)
+--timer.initiate_periodic_health_checks(10)
 
 -- Return 200 to the status check
 if r.status and r.internal then
-    ngx.exit(ngx.HTTP_OK)
+    return ngx.exit(ngx.HTTP_OK)
 end
 
 local method = r.method
