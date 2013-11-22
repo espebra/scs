@@ -126,9 +126,6 @@ local function lookup_object(r)
         elseif host == false then
             out['message'] = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts."
             out['success'] = false
-        elseif host == false then
-            out['message'] = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts."
-            out['success'] = false
             exitcode = ngx.HTTP_NOT_FOUND
         elseif not meta then
             -- Rewrite to correct node
