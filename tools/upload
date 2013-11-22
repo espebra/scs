@@ -3,6 +3,7 @@
 host="10.0.0.2"
 
 path=$1
+bucket=$2
 
 if [ -x /usr/bin/md5sum ]; then
     md5=$(md5sum $path | awk '{print $1}')
@@ -19,7 +20,7 @@ if [ -f "${path}" ]; then
     filename=$(basename $path)
     echo "Uploading $filename..."
     #curl -i -L -H 'expect: 100-continue' --data-binary "@${path}" "http://tindeimport.i.bitbit.net/${filename}"
-    curl -i -L -H 'expect: 100-continue' -H "x-md5: $md5" --data-binary "@${path}" "http://${host}/${filename}?bucket=testbucket"
+    curl -i -L -H 'expect: 100-continue' -H "x-md5: $md5" --data-binary "@${path}" "http://${host}/${filename}?bucket=${bucket}"
 else
     echo "$path is not a file"
 fi
