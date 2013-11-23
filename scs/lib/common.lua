@@ -12,7 +12,7 @@ local function read_file(path)
 
     local cache = ngx.shared.cache
     if cache then
-        content, flags = cache:get(path)
+        content, flags = cache:get("file " .. path)
     end
 
     if content then
@@ -22,7 +22,7 @@ local function read_file(path)
         if f then
             content = f:read("*all")
             f:close()
-            local succ, err, forcible = cache:set(path, content)
+            local succ, err, forcible = cache:set("file " .. path, content)
             if succ then
                 ngx.log(ngx.INFO,"Cached the content of " .. path .. ", " .. #content .. " bytes")
             else
@@ -270,19 +270,34 @@ function M.get_site_hosts(site)
 end
 
 -- Return a table containing the sites in the configuration
-function M.get_all_sites()
-    local sites = ngx.shared.sites
-    if not sites then
-        sites = {}
-        local conf = M.get_configuration()
-        for host,h in pairs(conf.current.hosts) do
-            if not M.inTable(sites, h['site']) then
-                table.insert(sites,h['site'])
-                ngx.log(ngx.INFO,"Caching: Site " .. h['site'] .. " is one of our sites")
-            end
+function M.get_sites()
+    local cache = ngx.shared.cache
+    local cache_key = "sites"
+    if cache then
+        local value, flags = cache:get(cache_key)
+        if value then
+            ngx.log(ngx.DEBUG,"Read sites from cache, " .. #value .. " bytes")
+            return cjson.decode(value)
         end
-        ngx.shared.sites = sites
     end
+
+    sites = {}
+    local conf = M.get_configuration()
+    for host,h in pairs(conf.current.hosts) do
+        if not M.inTable(sites, h['site']) then
+            table.insert(sites,h['site'])
+            ngx.log(ngx.INFO,"Caching: Site " .. h['site'] .. " is one of our sites")
+        end
+    end
+
+    local value = cjson.encode(sites)
+    local succ, err, forcible = cache:set(cache_key, value)
+    if succ then
+        ngx.log(ngx.INFO,"Cached sites successfully, " .. #value .. " bytes")
+    else
+        ngx.log(ngx.WARN,"Unable to cache sites")
+    end
+
     return sites
 end
 
@@ -348,7 +363,7 @@ end
 function M.get_object_replica_sites(bucket, object)
     -- TODO: Should store the hash map in memory to avoid having to create it 
     -- for each request.
-    local sites = M.get_all_sites()
+    local sites = M.get_sites()
     local hash_map = M.create_hash_map(sites)
 
     -- Now we have a hash map, either created or read from memory. Use it to

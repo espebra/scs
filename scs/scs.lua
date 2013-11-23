@@ -200,7 +200,7 @@ local function lookup_bucket(r)
         local port = common.get_bind_port()
         headers['user-agent'] = "scs internal"
 
-        local sites = common.get_all_sites()
+        local sites = common.get_sites()
         local entries = 0
         local size = 0
         for i,site in ipairs(sites) do
