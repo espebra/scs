@@ -669,7 +669,7 @@ function M.get_local_object_versions(bucket, object)
             end
         end
     end
-    ngx.log(ngx.INFO,"Found " .. #versions .. " versions locally of " .. bucket .. "/" .. object .. " in " .. path)
+    ngx.log(ngx.DEBUG,"Found " .. #versions .. " versions locally of " .. bucket .. "/" .. object .. " in " .. path)
     return versions
 end
 

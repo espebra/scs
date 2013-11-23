@@ -7,6 +7,7 @@ local function rewrite_request(r)
     local object = r.object
     local bucket = r.bucket
     local dir = r.dir
+    local internal = r.internal
     local object_base64 = r.object_base64
     local dir = common.get_storage_directory()
 
@@ -21,6 +22,11 @@ local function rewrite_request(r)
             local uri = "/" .. bucket .. "/" .. depth .. "/" .. object_base64 .. "/" .. versions[1].version .. "-" .. versions[1].md5 .. ".data"
             ngx.log(ngx.INFO,"Found " .. bucket .. "/" .. object .. " in local file system. Rewriting URI " .. ngx.var.uri .. " to " .. uri)
             ngx.req.set_uri(uri, true)
+        else
+            if internal then
+                -- Send 404 internally if the object was not found locally
+                ngx.exit(ngx.HTTP_NOT_FOUND)
+            end
         end
     end
 
