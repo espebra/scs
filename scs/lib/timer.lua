@@ -28,9 +28,9 @@ function M.initiate_periodic_health_checks(delay)
             return
         end
 
-        local sites = common.get_sites()
+        local hosts = common.get_hosts()
         while true do
-            common.update_status_for_all_hosts(sites)
+            common.update_status(hosts)
             ngx.sleep(delay)
         end
         return

@@ -269,6 +269,36 @@ function M.get_site_hosts(site)
     return hosts
 end
 
+-- Return a table containing the hosts in the configuration
+function M.get_hosts()
+    local cache = ngx.shared.cache
+    local cache_key = "hosts"
+    if cache then
+        local value, flags = cache:get(cache_key)
+        if value then
+            ngx.log(ngx.DEBUG,"Read " .. cache_key .. " from cache, " .. #value .. " bytes")
+            return cjson.decode(value)
+        end
+    end
+
+    hosts = {}
+    local conf = M.get_configuration()
+    for host,h in pairs(conf.current.hosts) do
+        table.insert(hosts,host)
+        ngx.log(ngx.INFO,"Caching: Host " .. host)
+    end
+
+    local value = cjson.encode(hosts)
+    local succ, err, forcible = cache:set(cache_key, value)
+    if succ then
+        ngx.log(ngx.INFO,"Cached " .. cache_key .. " successfully, " .. #value .. " bytes")
+    else
+        ngx.log(ngx.WARN,"Unable to cache " .. cache_key)
+    end
+
+    return hosts
+end
+
 -- Return a table containing the sites in the configuration
 function M.get_sites()
     local cache = ngx.shared.cache
@@ -276,7 +306,7 @@ function M.get_sites()
     if cache then
         local value, flags = cache:get(cache_key)
         if value then
-            ngx.log(ngx.DEBUG,"Read sites from cache, " .. #value .. " bytes")
+            ngx.log(ngx.DEBUG,"Read " .. cache_key .. " from cache, " .. #value .. " bytes")
             return cjson.decode(value)
         end
     end
@@ -286,16 +316,16 @@ function M.get_sites()
     for host,h in pairs(conf.current.hosts) do
         if not M.inTable(sites, h['site']) then
             table.insert(sites,h['site'])
-            ngx.log(ngx.INFO,"Caching: Site " .. h['site'] .. " is one of our sites")
+            ngx.log(ngx.INFO,"Caching: Site " .. h['site'])
         end
     end
 
     local value = cjson.encode(sites)
     local succ, err, forcible = cache:set(cache_key, value)
     if succ then
-        ngx.log(ngx.INFO,"Cached sites successfully, " .. #value .. " bytes")
+        ngx.log(ngx.INFO,"Cached " .. cache_key .. " successfully, " .. #value .. " bytes")
     else
-        ngx.log(ngx.WARN,"Unable to cache sites")
+        ngx.log(ngx.WARN,"Unable to cache " .. cache_key)
     end
 
     return sites
@@ -672,31 +702,56 @@ end
 
 -- Function to fetch host status and update the cached status for all hosts
 -- found in the configuration.
-function M.update_status_for_all_hosts(sites)
-    sites = M.randomize_table(sites)
+function M.update_status(hosts)
     local port = M.get_bind_port()
     local unavailable = {}
-    local total_hosts = 0
-    for i,site in ipairs(sites) do
-        local hosts = M.get_site_hosts(site)
-        hosts = M.randomize_table(hosts)
-        total_hosts = total_hosts + #hosts
-        for i,host in ipairs(hosts) do
-            local status = M.remote_host_availability(host, port)
-            -- Status is true or false to indicate if the host is
-            -- available or not.
-            M.update_host_status(host,status)
+    local total_hosts = #hosts
 
-            if not status then
-                table.insert(unavailable,host)
-            end
+    hosts = M.randomize_table(hosts)
+    for i,host in ipairs(hosts) do
+        local status = M.remote_host_availability(host, port)
+        -- Status is true or false to indicate if the host is
+        -- available or not.
+        M.update_host_status(host,status)
+
+        if not status then
+            table.insert(unavailable,host)
         end
     end
+    
 
     if #unavailable > 0 then
         ngx.log(ngx.DEBUG,#unavailable .. " of the " .. total_hosts .. " hosts are unavailable: " .. tostring(unavailable))
     end
 end
+
+-- Function to fetch host status and update the cached status for all hosts
+-- found in the configuration.
+--function M.update_status_for_all_hosts(sites)
+--    sites = M.randomize_table(sites)
+--    local port = M.get_bind_port()
+--    local unavailable = {}
+--    local total_hosts = 0
+--    for i,site in ipairs(sites) do
+--        local hosts = M.get_site_hosts(site)
+--        hosts = M.randomize_table(hosts)
+--        total_hosts = total_hosts + #hosts
+--        for i,host in ipairs(hosts) do
+--            local status = M.remote_host_availability(host, port)
+--            -- Status is true or false to indicate if the host is
+--            -- available or not.
+--            M.update_host_status(host,status)
+--
+--            if not status then
+--                table.insert(unavailable,host)
+--            end
+--        end
+--    end
+--
+--    if #unavailable > 0 then
+--        ngx.log(ngx.DEBUG,#unavailable .. " of the " .. total_hosts .. " hosts are unavailable: " .. tostring(unavailable))
+--    end
+--end
 
 -- Verify the checksum of the file. Return true if valid, false if corrupt.
 function M.is_checksum_valid(bucket, object, version, md5)
