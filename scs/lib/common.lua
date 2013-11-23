@@ -6,17 +6,29 @@ local http = require "resty.http.simple"
 local ngx = require "ngx"
 
 -- Read a json file
-local function read_file(path, required)
+local function read_file(path)
     local f = nil
     local content = false
-    if required then
-        f = assert(io.open(path, "r"))
+
+    local cache = ngx.shared.cache
+    if cache then
+        content, flags = cache:get(path)
+    end
+
+    if content then
+        ngx.log(ngx.DEBUG,"Read contents of " .. path .. " from cache, " .. #content .. " bytes")
     else
         f = io.open(path, "r")
-    end
-    if f then
-        content = f:read("*all")
-        f:close()
+        if f then
+            content = f:read("*all")
+            f:close()
+            local succ, err, forcible = cache:set(path, content)
+            if succ then
+                ngx.log(ngx.INFO,"Cached the content of " .. path .. ", " .. #content .. " bytes")
+            else
+                ngx.log(ngx.WARN,"Unable to cache the contents of " .. path)
+            end
+        end
     end
     return content
 end
@@ -238,15 +250,8 @@ function M.get_storage_directory()
 end
 
 function M.get_configuration()
-    local c = ngx.shared.conf
-    local json = c:get('conf')
-    -- local conf, flags = c:get('conf')
-    if not json then
-        local path = "/etc/scs/scs.conf"
-        json = read_file(path, true)
-        c:set('conf', json)
-        ngx.log(ngx.INFO, "Caching: Configuration")
-    end
+    local path = "/etc/scs/scs.conf"
+    json = read_file(path)
     local conf = cjson.decode(json)
     return conf
 end
