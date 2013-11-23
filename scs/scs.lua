@@ -93,6 +93,21 @@ local cjson = require 'cjson'
 --     return exitcode
 -- end
 
+local function lookup_cluster_status()
+    local exitcode = ngx.HTTP_OK
+    local out = {}
+    out['sites'] = common.get_sites()
+    local hosts = {}
+    for i,host in ipairs(common.get_hosts()) do
+        local status = common.get_host_status(host)
+        local h = {}
+        h[host] = status
+        table.insert(hosts, h)
+    end
+    out['hosts'] = hosts
+    return exitcode, out
+end
+
 local function lookup_object(r)
     local exitcode = ngx.HTTP_NOT_FOUND
     local out = {}
@@ -374,7 +389,9 @@ elseif method == "GET" or method == "HEAD" then
     -- elseif r['bucket'] and r['object'] then
     --     exitcode = lookup_object(r)
     -- end
-    if not r.bucket then
+    if not r.bucket and not r.object then
+        exitcode, out = lookup_cluster_status()
+    elseif not r.bucket then
         exitcode = 200
         out['success'] = false
         out['message'] = "Bucket not specified"

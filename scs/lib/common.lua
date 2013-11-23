@@ -35,19 +35,20 @@ end
 
 -- Return the host availability
 function M.get_host_status(host)
-    local s = ngx.shared.status
-    local value, flags = s:get(host)
+    local cache_key = "host " .. host
+    local cache = ngx.shared.cache
+    local value, flags = cache:get(cache_key)
 
     -- Return only true / false
     if value == nil then
         value = false
     end
 
-    -- if value then
-    --     ngx.log(ngx.ERR,"Host " .. host .. " is up")
-    -- else
-    --     ngx.log(ngx.ERR,"Host " .. host .. " is down")
-    -- end
+    if value then
+        ngx.log(ngx.DEBUG,"Lookup: Host " .. host .. " is up")
+    else
+        ngx.log(ngx.DEBUG,"Lookup: Host " .. host .. " is down")
+    end
     return value
 end
 
