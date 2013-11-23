@@ -4,10 +4,21 @@ local common = require "common"
 local ngx = ngx
 
 function M.initiate_periodic_health_checks(delay)
-    if ngx.shared.health_check_timer then
-        return
+    local cache_key = "periodic_health_checks_started"
+    local cache = ngx.shared.cache
+    if cache then
+        local value, flags = cache:get(cache_key)
+        if value then
+            -- Periodic health checks are already running
+            return
+        end
+    end
+
+    local succ, err, forcible = cache:set(cache_key, true)
+    if succ then
+        ngx.log(ngx.INFO, "Periodic health checks started")
     else
-        ngx.shared.health_check_timer = true
+        ngx.log(ngx.ERR, "Unable to mark periodic health checks as started")
     end
 
     local handler
