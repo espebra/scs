@@ -52,32 +52,32 @@ function M.get_host_status(host)
 end
 
 -- Update the status for a host
-function M.update_host_status(host, status)
-    local s = ngx.shared.status
-
-    local previous_status = s:get(host)
-
-    if previous_status == status then
-        -- no change
-        return true
-    else
-        if status then
-            ngx.log(ngx.ERR,"Host " .. host .. " is now up!")
-        else
-            ngx.log(ngx.ERR,"Host " .. host .. " is now unavailable!")
-        end
-    
-        local success, err, forcible
-        success, err, forcible = s:set(host, status)
-
-        if success then
-            return true
-        else
-            ngx.log(ngx.ERR,"Failed to cache status for host " .. host .. ": " .. err)
-            return false
-        end
-    end
-end
+--function M.update_host_status(host, status)
+--    local s = ngx.shared.status
+--
+--    local previous_status = s:get(host)
+--
+--    if previous_status == status then
+--        -- no change
+--        return true
+--    else
+--        if status then
+--            ngx.log(ngx.ERR,"Host " .. host .. " is now up!")
+--        else
+--            ngx.log(ngx.ERR,"Host " .. host .. " is now unavailable!")
+--        end
+--    
+--        local success, err, forcible
+--        success, err, forcible = s:set(host, status)
+--
+--        if success then
+--            return true
+--        else
+--            ngx.log(ngx.ERR,"Failed to cache status for host " .. host .. ": " .. err)
+--            return false
+--        end
+--    end
+--end
 
 -- Verify that the bucket name is valid
 function M.verify_bucket(bucket)
@@ -706,52 +706,45 @@ function M.update_status(hosts)
     local port = M.get_bind_port()
     local unavailable = {}
     local total_hosts = #hosts
+    local cache = ngx.shared.cache
 
     hosts = M.randomize_table(hosts)
     for i,host in ipairs(hosts) do
-        local status = M.remote_host_availability(host, port)
         -- Status is true or false to indicate if the host is
         -- available or not.
-        M.update_host_status(host,status)
+        local status = M.remote_host_availability(host, port)
 
-        if not status then
-            table.insert(unavailable,host)
+        if cache then
+            local cache_key = "host " .. host
+            local previous_status, flags = cache:get(cache_key)
+
+            if previous_status == status then
+                 -- No status change
+                if status then
+                    ngx.log(ngx.DEBUG,"No change: Host " .. host .. " is still up!")
+                else
+                    ngx.log(ngx.DEBUG,"No change: Host " .. host .. " is still unavailable!")
+                end
+            else
+                 -- Status change
+                if status then
+                    ngx.log(ngx.INFO,"Host " .. host .. " is now up!")
+                else
+                    ngx.log(ngx.WARN,"Host " .. host .. " is now unavailable!")
+                end
+
+                 -- Cache the new status
+                local success, err, forcible = cache:set(cache_key, status)
+        
+                if success then
+                    ngx.log(ngx.DEBUG,"Cached host status for host " .. host)
+                else
+                    ngx.log(ngx.WARN,"Failed to cache status for host " .. host .. ": " .. err)
+                end
+            end
         end
     end
-    
-
-    if #unavailable > 0 then
-        ngx.log(ngx.DEBUG,#unavailable .. " of the " .. total_hosts .. " hosts are unavailable: " .. tostring(unavailable))
-    end
 end
-
--- Function to fetch host status and update the cached status for all hosts
--- found in the configuration.
---function M.update_status_for_all_hosts(sites)
---    sites = M.randomize_table(sites)
---    local port = M.get_bind_port()
---    local unavailable = {}
---    local total_hosts = 0
---    for i,site in ipairs(sites) do
---        local hosts = M.get_site_hosts(site)
---        hosts = M.randomize_table(hosts)
---        total_hosts = total_hosts + #hosts
---        for i,host in ipairs(hosts) do
---            local status = M.remote_host_availability(host, port)
---            -- Status is true or false to indicate if the host is
---            -- available or not.
---            M.update_host_status(host,status)
---
---            if not status then
---                table.insert(unavailable,host)
---            end
---        end
---    end
---
---    if #unavailable > 0 then
---        ngx.log(ngx.DEBUG,#unavailable .. " of the " .. total_hosts .. " hosts are unavailable: " .. tostring(unavailable))
---    end
---end
 
 -- Verify the checksum of the file. Return true if valid, false if corrupt.
 function M.is_checksum_valid(bucket, object, version, md5)
