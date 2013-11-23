@@ -52,34 +52,6 @@ function M.get_host_status(host)
     return value
 end
 
--- Update the status for a host
---function M.update_host_status(host, status)
---    local s = ngx.shared.status
---
---    local previous_status = s:get(host)
---
---    if previous_status == status then
---        -- no change
---        return true
---    else
---        if status then
---            ngx.log(ngx.ERR,"Host " .. host .. " is now up!")
---        else
---            ngx.log(ngx.ERR,"Host " .. host .. " is now unavailable!")
---        end
---    
---        local success, err, forcible
---        success, err, forcible = s:set(host, status)
---
---        if success then
---            return true
---        else
---            ngx.log(ngx.ERR,"Failed to cache status for host " .. host .. ": " .. err)
---            return false
---        end
---    end
---end
-
 -- Verify that the bucket name is valid
 function M.verify_bucket(bucket)
 

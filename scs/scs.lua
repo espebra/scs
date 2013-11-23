@@ -96,12 +96,14 @@ local cjson = require 'cjson'
 local function lookup_cluster_status()
     local exitcode = ngx.HTTP_OK
     local out = {}
+    --out['conf'] = common.get_configuration()
     out['sites'] = common.get_sites()
     local hosts = {}
     for i,host in ipairs(common.get_hosts()) do
         local status = common.get_host_status(host)
         local h = {}
-        h[host] = status
+        h['host'] = host
+        h['status'] = status
         table.insert(hosts, h)
     end
     out['hosts'] = hosts
