@@ -84,6 +84,19 @@ function Request.Constructor(self)
         self.debug = true
     end
 
+    self.version = nil
+    if h['x-version'] then
+        self.version = h['x-version']
+    elseif args['x-version'] then
+        self.version = args['x-version']
+    end
+    if self.version then
+        if not ngx.re.match(self.version, '^[0-9]+$','j') then
+            ngx.log(ngx.ERR,"request version contains invalid characters")
+            self.version = nil
+        end
+    end
+
     if h['x-meta'] then
         self.meta = true
     elseif args['x-meta'] then
