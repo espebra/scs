@@ -108,16 +108,17 @@ function Request.Constructor(self)
         end
     end
 
-    if h['debug'] then
-        self.debug = true
-    elseif args['debug'] then
-        self.debug = true
-    end
-
+    -- Return meta data
     if h['x-meta'] then
         self.meta = true
     elseif args['x-meta'] then
         self.meta = true
+    end
+
+    if h['debug'] then
+        self.debug = true
+    elseif args['debug'] then
+        self.debug = true
     end
 
     if h['x-md5'] then
