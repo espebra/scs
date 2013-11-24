@@ -34,12 +34,9 @@ function M.initiate_periodic_health_checks(delay)
         local hosts = conf.hosts
         while true do
 
-            -- Might not really be necessary
-            hosts = common.randomize_table(hosts)
-
-            for host, v in pairs(hosts) do
-                ngx.log(ngx.INFO,"Health check host " .. host)
-                common.update_host_status(host)
+            for host, h in pairs(conf.hosts) do
+                ngx.log(ngx.DEBUG,"Health checking host " .. host .. " port " .. h['port'])
+                common.update_host_status(host,h['port'])
 
                 -- Some minor sleep between each check
                 ngx.sleep(0.1)

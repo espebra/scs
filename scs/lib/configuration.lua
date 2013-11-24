@@ -120,7 +120,6 @@ function Configuration.Constructor(self)
 
     if l then
         self.storage = l.storage
-        self.port = l.port
     end
 
     if h then

@@ -7,12 +7,11 @@ local http = require "resty.http.simple"
 
 -- Function to fetch host status and update the cached status for all hosts
 -- found in the configuration.
-function M.update_host_status(host)
+function M.update_host_status(host, port)
     -- Status is true or false to indicate if the host is
     -- available or not.
     local method = "HEAD"
     local path = "/"
-    local port = 80
     local headers = {}
     headers['x-ping'] = true
     headers['user-agent'] = "scs internal"
