@@ -377,9 +377,7 @@ local cjson = require 'cjson'
 --
 ----ngx.header["server"] = nil
 --
---local exitcode = nil
---local out = {}
---
+
 --if method == "POST" then
 --    exitcode, out = post_object(r)
 --elseif method == "PUT" then
@@ -417,25 +415,53 @@ local cjson = require 'cjson'
 --    exitcode = 500
 --end
 --
----- Send the exit code to nginx
---ngx.status = exitcode
---
----- We have some output for the client
---if out then
---    ngx.header["content-type"] = "application/json"
---    ngx.say(cjson.encode(out))
---end
-
 
 --local conf = Configuration()
+local exitcode = 500
+local out = {}
+
 local r = Request()
 
 --for host, v in pairs(conf.hosts) do
 --    ngx.log(ngx.INFO,"Caching: Host " .. host)
 --end
 
+-- method
+-- object (version)
+-- bucket
+-- meta
+
+if r.object and r.bucket then
+    if r.meta then
+        out['object'] = r.object
+        out['bucket'] = r.bucket
+        if r.dir then
+            out['versions'] = common.get_local_object(r.storage .. '/' .. r.dir)
+        end
+    else
+        ngx.log(ngx.DEBUG, 'object ' .. r.object .. ' in bucket ' .. r.bucket .. ' was not found locally. Check replica hosts')
+        -- return 302, 404 or 503 (if no replica hosts are up)
+    end
+    exitcode = 200
+elseif r.bucket then
+    exitcode = 200
+    out['message'] = 'bucket only'
+else
+    exitcode = 200
+    out['message'] = 'no bucket and no object'
+end
+
 local elapsed = ngx.now() - ngx.req.start_time()
 if not ngx.headers_sent then
     ngx.header["x-elapsed"] = elapsed
+end
+
+-- Send the exit code to nginx
+ngx.status = exitcode
+
+-- We have some output for the client
+if out then
+    ngx.header["content-type"] = "application/json"
+    ngx.print(cjson.encode(out))
 end
 

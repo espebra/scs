@@ -73,6 +73,7 @@ end
 function Request.Constructor(self)
     local conf = Configuration()
     self.storage = conf.storage
+    self.flags = 0
 
     local h = ngx.req.get_headers()
     local args = ngx.req.get_uri_args()
