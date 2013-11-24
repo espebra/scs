@@ -1,12 +1,12 @@
 local class = require "kidclass"
+local Configuration = require "configuration"
 local Request = class.new();
 local ngx = ngx
 
 ---------------
 -- Private API
 ---------------
-local function get_directory_depth(object)
-    local md5 = ngx.md5(object)
+local function get_directory_depth(md5)
     local dir = false
     if md5 then
         local m, err = ngx.re.match(md5, "^(..)(..)",'j')
@@ -71,11 +71,41 @@ end
 -- Public API
 ---------------
 function Request.Constructor(self)
+    local conf = Configuration()
+    self.storage = conf.storage
+
     local h = ngx.req.get_headers()
     local args = ngx.req.get_uri_args()
 
+    -- Used to identify internal requests between the replica hosts. 
+    -- This is not a security feature.
     if h['user-agent'] then
         self.internal = _is_internal(h['user-agent'])
+    end
+
+    -- PING request. These are used as health checks between replica hosts.
+    if h['x-ping'] then
+        self.ping = true
+    elseif args['x-ping'] then
+        self.ping = true
+    end
+
+    -- Let the client specify a version of the object to fetch
+    self.version = nil
+    if h['x-version'] then
+        self.version = h['x-version']
+    elseif args['x-version'] then
+        self.version = args['x-version']
+    end
+
+    if self.version then
+        if not ngx.re.match(self.version, '^[0-9]+$','j') then
+            ngx.log(ngx.ERR,"Request version contains invalid characters")
+            self.version = nil
+        else
+            -- Cast if the content is valid
+            self.version = tonumber(self.version)
+        end
     end
 
     if h['debug'] then
@@ -84,27 +114,10 @@ function Request.Constructor(self)
         self.debug = true
     end
 
-    self.version = nil
-    if h['x-version'] then
-        self.version = h['x-version']
-    elseif args['x-version'] then
-        self.version = args['x-version']
-    end
-    if self.version then
-        if not ngx.re.match(self.version, '^[0-9]+$','j') then
-            ngx.log(ngx.ERR,"request version contains invalid characters")
-            self.version = nil
-        end
-    end
-
     if h['x-meta'] then
         self.meta = true
     elseif args['x-meta'] then
         self.meta = true
-    end
-
-    if h['x-status'] then
-        self.status = h['x-status']
     end
 
     if h['x-md5'] then
@@ -148,23 +161,20 @@ function Request.Constructor(self)
 
     -- Set both the object and object_base64 to nil if the length of the object
     -- name is 0.
-    local object_base64 = nil
-    local object_name_md5 = nil
-    if #self.object > 0 then
+    if self.bucket and #self.object > 0 then
         self.object_base64 = ngx.encode_base64(self.object)
         self.object_name_md5 = ngx.md5(self.object)
+        self.dir = "/" .. self.bucket .. "/" .. get_directory_depth(self.object_name_md5) .. "/" .. self.object_base64
     else
         -- Do not allow 0 character object names
         self.object = nil
+        self.object_base64 = nil
+        self.object_name_md5 = nil
     end
 
     self.method = ngx.var.request_method
 
-    if self.object then
-        self.dir = get_directory_depth(self.object)
-    end
-
-    -- Clean up
+    -- Clean up the headers here
     ngx.header['Server'] = 'scs'
 end
 

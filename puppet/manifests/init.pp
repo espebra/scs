@@ -71,9 +71,17 @@ file {
         ensure  => link,
         source  => '/vagrant/scs/conf/scs.init',
         notify  => Service['scs'];
-    '/etc/scs/scs.conf':
+    '/etc/scs/hosts.conf':
         ensure  => link,
-        source  => '/vagrant/scs/conf/scs.conf',
+        source  => '/vagrant/scs/conf/hosts.conf',
+        notify  => Service['scs'];
+    '/etc/scs/common.conf':
+        ensure  => link,
+        source  => '/vagrant/scs/conf/common.conf',
+        notify  => Service['scs'];
+    '/etc/scs/local.conf':
+        ensure  => link,
+        source  => '/vagrant/scs/conf/local.conf',
         notify  => Service['scs'];
     '/usr/local/sbin/p':
         source  => '/vagrant/puppet/files/puppet/p',
