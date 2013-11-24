@@ -2,7 +2,7 @@ local M = {}
 
 local ngx = require "ngx"
 local cjson = require "cjson"
---local Flexihash = require 'Flexihash'
+local Flexihash = require 'Flexihash'
 local http = require "resty.http.simple"
 
 -- Function to fetch host status and update the cached status for all hosts
@@ -122,116 +122,24 @@ function M.path_exists(path)
   return file ~= nil
 end
 
---function M.read_file(path)
---    local f = nil
---    local content = false
---
---    local cache = ngx.shared.cache
---    if cache then
---        content, flags = cache:get("file " .. path)
---    end
---
---    if content then
---        ngx.log(ngx.DEBUG,"Read contents of " .. path .. " from cache, " .. #content .. " bytes")
---    else
---        f = io.open(path, "r")
---        if f then
---            content = f:read("*all")
---            f:close()
---            local succ, err, forcible = cache:set("file " .. path, content)
---            if succ then
---                ngx.log(ngx.INFO,"Cached the content of " .. path .. ", " .. #content .. " bytes")
---            else
---                ngx.log(ngx.WARN,"Unable to cache the contents of " .. path)
---            end
---        end
---    end
---    return content
---end
+-- Return the host availability
+function M.get_host_status(host)
+    local cache_key = "host " .. host
+    local cache = ngx.shared.cache
+    local value, flags = cache:get(cache_key)
 
----- Return the host availability
---function M.get_host_status(host)
---    local cache_key = "host " .. host
---    local cache = ngx.shared.cache
---    local value, flags = cache:get(cache_key)
---
---    -- Return only true / false
---    if value == nil then
---        value = false
---    end
---
---    if value then
---        ngx.log(ngx.DEBUG,"Lookup: Host " .. host .. " is up")
---    else
---        ngx.log(ngx.DEBUG,"Lookup: Host " .. host .. " is down")
---    end
---    return value
---end
---
----- Verify that the bucket name is valid
---function M.verify_bucket(bucket)
---
---    -- Must not be false
---    if not bucket then
---        --ngx.log(ngx.WARN,"Bucket name is not set")
---        return false
---    end
---
---    -- Must not be less than 3 characters
---    if #bucket < 3 then
---        --ngx.log(ngx.WARN,"Bucket name is too short")
---        return false
---    end
---
---    -- Must not be more than 63 characters
---    if #bucket > 63 then
---        --ngx.log(ngx.WARN,"Bucket name is too long")
---        return false
---    end
---
---    -- Must contain only allowed characters
---    if not ngx.re.match(bucket, '^[a-z0-9-]+$','j') then
---        --ngx.log(ngx.WARN,"Bucket name contains illegal characters")
---        return false
---    end
---
---    -- Must not start with -
---    if ngx.re.match(bucket, '^-','j') then
---        --ngx.log(ngx.WARN,"Bucket name starts with -")
---        return false
---    end
---
---    -- Must not end with -
---    if ngx.re.match(bucket, '-$','j') then
---        --ngx.log(ngx.WARN,"Bucket name ends with -")
---        return false
---    end
---
---    return true
---end
---
----- Check if an object exists in the local file system
----- function M.object_exists_locally(dir, bucket, object_base64)
-----    local path = dir .. "/" ..  bucket .. "/" .. object_base64
-----    return M.is_file(path)
----- end
---
----- Return the value of a given request header, or nil if the header is not set
---function M.get_header(header, headers)
---    if headers[header] then
---        return headers[header]
---    end
---    return nil
---end
---
----- Return the value of a given request parameter, or nil if the parameter is not set
---function M.get_parameter(parameter, parameters)
---    if parameters[parameter] then
---        return parameters[parameter]
---    end
---    return nil
---end
---
+    -- Return only true / false
+    if value == nil then
+        value = false
+    end
+
+    if value then
+        ngx.log(ngx.DEBUG,"Cache lookup: Host " .. host .. " is up")
+    else
+        ngx.log(ngx.DEBUG,"Cache lookup: Host " .. host .. " is down")
+    end
+    return value
+end
 
 function M.http_request(host, port, headers, method, path, timeout)
     local res, err = http.request(host, port, {
@@ -289,11 +197,6 @@ end
 --        url = "http://" .. host .. ":" .. port .. "/" .. object .. "?bucket=" .. bucket
 --    end
 --    return url
---end
---
---function M.get_write_back()
---    local conf = M.get_configuration()
---    return conf.current.write_back
 --end
 --
 --function M.get_replicas_per_site()
