@@ -1,6 +1,7 @@
 local M = {}
 
 local common = require "common"
+local Configuration = require "configuration"
 local ngx = ngx
 
 function M.initiate_periodic_health_checks(delay)
@@ -21,6 +22,8 @@ function M.initiate_periodic_health_checks(delay)
         ngx.log(ngx.ERR, "Unable to mark periodic health checks as started")
     end
 
+    local conf = Configuration()
+
     local handler
     handler = function (premature)
         -- do some routine job in Lua just like a cron job
@@ -28,9 +31,19 @@ function M.initiate_periodic_health_checks(delay)
             return
         end
 
-        local hosts = common.get_hosts()
+        local hosts = conf.hosts
         while true do
-            common.update_status(hosts)
+
+            -- Might not really be necessary
+            hosts = common.randomize_table(hosts)
+
+            for host, v in pairs(hosts) do
+                ngx.log(ngx.INFO,"Health check host " .. host)
+                common.update_host_status(host)
+
+                -- Some minor sleep between each check
+                ngx.sleep(0.1)
+            end
             ngx.sleep(delay)
         end
         return

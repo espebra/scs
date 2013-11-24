@@ -3,7 +3,65 @@ local M = {}
 local ngx = require "ngx"
 local cjson = require "cjson"
 --local Flexihash = require 'Flexihash'
---local http = require "resty.http.simple"
+local http = require "resty.http.simple"
+
+-- Function to fetch host status and update the cached status for all hosts
+-- found in the configuration.
+function M.update_host_status(host)
+    -- Status is true or false to indicate if the host is
+    -- available or not.
+    local method = "HEAD"
+    local path = "/"
+    local port = 80
+    local headers = {}
+    headers['x-ping'] = true
+    headers['user-agent'] = "scs internal"
+    local timeout = 1000
+    local status = M.http_request(host, port, headers, method, path, timeout)
+
+    local cache = ngx.shared.cache
+    if cache then
+        local cache_key = "host " .. host
+        local previous_status, flags = cache:get(cache_key)
+
+        if previous_status == status then
+             -- No status change
+            if status then
+                ngx.log(ngx.DEBUG,"No change: Host " .. host .. " is still up!")
+            else
+                ngx.log(ngx.DEBUG,"No change: Host " .. host .. " is still unavailable!")
+            end
+        else
+             -- Status change
+            if status then
+                ngx.log(ngx.INFO,"Host " .. host .. " is now up!")
+            else
+                ngx.log(ngx.WARN,"Host " .. host .. " is now unavailable!")
+            end
+
+             -- Cache the new status
+            local success, err, forcible = cache:set(cache_key, status)
+            if success then
+                ngx.log(ngx.DEBUG,"Cached host status for host " .. host)
+            else
+                ngx.log(ngx.ERR,"Failed to cache status for host " .. host .. ": " .. err)
+            end
+        end
+    end
+end
+
+-- Function to randomize a table
+function M.randomize_table(t)
+    if t then
+        for i = #t, 2, -1 do
+            -- select a random number between 1 and i
+            local r = math.random(i)
+             -- swap the randomly selected item to position i
+            t[i], t[r] = t[r], t[i]
+        end
+    end
+    return t
+end
 
 -- Check if value exists in table, return key
 function M.inTable(tbl, item)
@@ -176,28 +234,28 @@ end
 --end
 --
 
---function M.http_request(host, port, headers, method, path, timeout)
---    local res, err = http.request(host, port, {
---        method  = method,
---        version = 0,
---        path    = path,
---        timeout = timeout,
---        headers = headers
---    })
---    if not res then
---        ngx.log(ngx.DEBUG,"Unable to execute " .. method .. " to http://" .. host .. ":" .. port .. path .. ": " .. err)
---        return nil
---    end
---
---    ngx.log(ngx.INFO,"HTTP " .. method .. " request to " .. host .. ":" .. port .. path .. " returned " .. res.status)
---
---    if res.status >= 200 and res.status < 300 then
---        return true, res.body
---    else
---        return false, nil
---    end
---end
---
+function M.http_request(host, port, headers, method, path, timeout)
+    local res, err = http.request(host, port, {
+        method  = method,
+        version = 0,
+        path    = path,
+        timeout = timeout,
+        headers = headers
+    })
+    if not res then
+        ngx.log(ngx.DEBUG,"Unable to execute " .. method .. " to http://" .. host .. ":" .. port .. path .. ": " .. err)
+        return nil
+    end
+
+    ngx.log(ngx.INFO,"HTTP " .. method .. " request to " .. host .. ":" .. port .. path .. " returned " .. res.status)
+
+    if res.status >= 200 and res.status < 300 then
+        return true, res.body
+    else
+        return false, nil
+    end
+end
+
 ---- Check if an object exists on a remote host
 --function M.object_exists_on_remote_host(host, port, bucket, object)
 --    local method = "HEAD"
@@ -212,17 +270,6 @@ end
 --    else
 --        return res
 --    end
---end
---
---function M.remote_host_availability(host, port)
---    local method = "HEAD"
---    local path = "/"
---    local headers = {}
---    local timeout = 500
---    headers['x-status'] = true
---    headers['user-agent'] = "scs internal"
---
---    return M.http_request(host, port, headers, method, path, timeout)
 --end
 --
 ---- Create a consistent hash of the values given in a table
@@ -423,17 +470,6 @@ end
 --        end
 --    end
 --    return dir 
---end
---
----- Function to randomize a table
---function M.randomize_table(t)
---    for i = #t, 2, -1 do
---        -- select a random number between 1 and i
---        local r = math.random(i)
---         -- swap the randomly selected item to position i
---        t[i], t[r] = t[r], t[i]
---    end
---    return t
 --end
 --
 ---- Figure out exactly which host to use from the hosts given from the hash

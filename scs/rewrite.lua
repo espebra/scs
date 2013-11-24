@@ -3,7 +3,7 @@ local common = require "common"
 local Request = require "request"
 --local Configuration = require "configuration"
 
---local timer = require "timer"
+local timer = require "timer"
 --local cjson = require 'cjson'
 
 local function rewrite_request(r)
@@ -116,7 +116,7 @@ end
 local r = Request()
 
 ---- Start periodic batch jobs here
---timer.initiate_periodic_health_checks(10)
+timer.initiate_periodic_health_checks(10)
 
 ---- Return 200 to the ping check
 if r.ping and r.internal then
