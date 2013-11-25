@@ -16,7 +16,7 @@ end
 
 Vagrant.configure('2') do |config|
   vm config, 'scs1', '10.0.0.2'
-  #vm config, 'scs2', '10.0.0.3'
-  #vm config, 'scs3', '10.0.0.4'
+  vm config, 'scs2', '10.0.0.3'
+  vm config, 'scs3', '10.0.0.4'
 end
 

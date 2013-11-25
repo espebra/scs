@@ -428,6 +428,14 @@ local function lookup_object(r)
     else
         ngx.log(ngx.DEBUG, 'object ' .. r.object .. ' in bucket ' .. r.bucket .. ' was not found locally. Check replica hosts')
         -- return 302, 404 or 503 (if no replica hosts are up)
+
+        for _,host in ipairs(r.hosts) do
+            if common.get_host_status(host) then
+                ngx.log(ngx.DEBUG,"FOO: host " .. host .. " is up")
+            else
+                ngx.log(ngx.DEBUG,"FOO: host " .. host .. " is down")
+            end
+        end
     end
     local exitcode = 200
     return exitcode, out
