@@ -417,6 +417,101 @@ end
 --end
 --
 
+local function post_object(r)
+    local internal = r.internal
+    local bucket = r.bucket
+    local object_md5 = r.object_md5
+    local object = r.object
+    local object_base64 = r.object_base64
+    local hosts = r.hosts
+
+    if not object_md5 or not r.dir or not r.storage or not hosts then
+        ngx.log(ngx.ERR,"Missing information")
+        ngx.exit(ngx.HTTP_BAD_REQUEST)
+    end
+
+    local object_name_on_disk = ngx.time() .. "-" .. object_md5 .. ".data"
+    local dir = r.storage .. "/" .. r.dir
+
+    local out = {}
+    out['hosts'] = hosts
+    out['object'] = object
+    out['md5'] = r.object_md5
+    out['bucket'] = bucket
+
+    local exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
+
+    if common.object_fits_on_this_host(hosts) then
+        -- local upload is ok
+
+        if not os.rename(dir, dir) then
+            os.execute('mkdir --mode=0755 --parents ' .. dir)
+        end
+
+        ngx.req.read_body()
+        local req_body_file = ngx.req.get_body_file()
+
+        if not req_body_file then
+            out['message'] = 'No file found in request'
+            exitcode = ngx.HTTP_BAD_REQUEST
+        end
+
+        if req_body_file == nil then
+            out['message'] = 'Request body is nil'
+            exitcode = ngx.HTTP_BAD_REQUEST
+        end
+
+        tmpfile = io.open(req_body_file)
+        realfile = io.open(dir .. "/" .. object_name_on_disk, 'w')
+
+        local size = 2^20      -- good buffer size (1M)
+        while true do
+            local block = tmpfile:read(size)
+            if not block then 
+                break
+            end
+            realfile:write(block)
+        end
+        tmpfile:close()
+        realfile:close()
+
+        if not common.path_exists(dir .. "/" .. object_name_on_disk) then
+            ngx.log(ngx.ERR,'Failed to write object ' .. object .. ' in bucket ' .. bucket .. ' to local file system (' .. dir .. '/' .. object_name_on_disk .. ')')
+            out['message'] = 'Failed to write object'
+            exitcode = ngx.HTTP_INTERNAL_SERVER_ERROR
+        else
+            out['message'] = 'The object was uploaded'
+
+            ngx.log(ngx.INFO,'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system (' .. dir .. '/' .. object_name_on_disk .. ')')
+            exitcode = ngx.HTTP_OK
+        end
+    else
+        hosts = common.randomize_table(hosts)
+
+        local host = nil
+        for h,_ in pairs(hosts) do
+            if common.get_host_status(h) then
+                host = h
+            end
+        end
+
+        if host == nil then
+            out['message'] = 'None of the hosts are available at the moment. Please try again later.'
+            ngx.log(ngx.WARN,'None of the hosts for object ' .. object .. ' in bucket ' .. bucket .. ' are available at the moment')
+            exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
+        else
+            -- Redirect to one of the corrent hosts here. 307.
+            local port = hosts[host]['port']
+            local url = common.generate_url(host,port,object,bucket,version)
+            out['message'] = 'local upload is not ok, prepare for redirect'
+            ngx.log(ngx.INFO,'Redirecting POST request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url)
+            ngx.header["Location"] = url
+            exitcode = 307
+        end
+    end
+    return exitcode, out
+end
+
 local function lookup_object(r)
     local object = r.object
     local bucket = r.bucket
@@ -481,7 +576,11 @@ local r = Request()
 -- meta
 
 if r.object and r.bucket then
-    exitcode, out = lookup_object(r)
+    if r.method == "HEAD" or r.method == "GET" then
+        exitcode, out = lookup_object(r)
+    elseif r.method == "POST" then
+        exitcode, out = post_object(r)
+    end
 elseif r.bucket then
     exitcode = 200
     out['message'] = 'bucket only'
@@ -505,3 +604,4 @@ if out then
     ngx.print(cjson.encode(out))
 end
 
+return ngx.exit(exitcode)

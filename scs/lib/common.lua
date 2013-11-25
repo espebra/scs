@@ -413,16 +413,16 @@ function M.get_host_with_object(hosts, bucket, object, version)
     return status
 end
 
----- Check if the request matches one of the hosts in the given table
---function M.object_fits_on_this_host(hosts)
---    for _,host in pairs(hosts) do
---        if ngx.req.get_headers()["Host"] == host then
---            return true
---        end
---    end
---    return false
---end
---
+-- Check if the request matches one of the hosts in the given table
+function M.object_fits_on_this_host(hosts)
+    for host,_ in pairs(hosts) do
+        if ngx.req.get_headers()["Host"] == host then
+            return true
+        end
+    end
+    return false
+end
+
 ---- Check whether the request is an internal scs request (true) or not (false)
 --function M.is_internal_request(useragent)
 --    if useragent then
