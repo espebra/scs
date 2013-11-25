@@ -2,6 +2,7 @@ local common = require "common"
 local Request = require "request"
 --local Configuration = require "configuration"
 local timer = require "timer"
+local resty_md5 = require "resty.string.md5"
 
 --local http = require "libs.resty.http.simple"
 --local Flexihash = require 'libs.Flexihash'
@@ -448,6 +449,8 @@ local function post_object(r)
             os.execute('mkdir --mode=0755 --parents ' .. dir)
         end
 
+        ----local md5 = resty_md5:new()
+
         ngx.req.read_body()
         local req_body_file = ngx.req.get_body_file()
 
@@ -464,7 +467,7 @@ local function post_object(r)
         tmpfile = io.open(req_body_file)
         realfile = io.open(dir .. "/" .. object_name_on_disk, 'w')
 
-        local size = 2^20      -- good buffer size (1M)
+        local size = 8192
         while true do
             local block = tmpfile:read(size)
             if not block then 
