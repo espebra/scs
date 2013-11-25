@@ -419,6 +419,42 @@ end
 --end
 --
 
+local function push_queue(r)
+    local bucket = r.bucket
+    local object = r.object
+    local hosts = r.hosts
+    local object_base64 = r.object_base64
+    local version = ngx.time()
+    local dir = r.storage .. "/queue/"
+    if not os.rename(dir, dir) then
+        os.execute('mkdir --mode=0755 --parents ' .. dir)
+    end
+
+    local out = {}
+    out['bucket'] = bucket
+    out['object'] = object
+    out['object_base64'] = object_base64
+    local path = r.storage .. "/objects/" .. r.dir
+    out['path'] = path
+
+    for host,_ in pairs(hosts) do
+        out['host'] = host
+
+        local filename = version .. "-" .. math.random(100,999)
+        file = io.open(dir .. "/" .. filename, 'w')
+        if file then
+            file:write(cjson.encode(out))
+            file:close()
+        end
+    end
+end
+
+local function delete_object(r)
+    local out = {}
+    local exitcode = ngx.HTTP_OK
+    return exitcode, out
+end
+
 local function post_object(r)
     local internal = r.internal
     local bucket = r.bucket
@@ -434,7 +470,6 @@ local function post_object(r)
     end
 
     local object_name_on_disk = version .. "-" .. object_md5 .. ".data"
-    local dir = r.storage .. "/" .. r.dir
 
     local out = {}
     out['hosts'] = hosts
@@ -447,6 +482,7 @@ local function post_object(r)
     if common.object_fits_on_this_host(hosts) then
         -- local upload is ok
 
+        local dir = r.storage .. "/objects/" .. r.dir 
         if not os.rename(dir, dir) then
             os.execute('mkdir --mode=0755 --parents ' .. dir)
         end
@@ -495,6 +531,9 @@ local function post_object(r)
             out['md5'] = object_md5
             out['version'] = version
 
+            -- Add the object to the relication short list queue
+            push_queue(r)
+
             ngx.log(ngx.INFO,'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system (' .. dir .. '/' .. object_name_on_disk .. ')')
             exitcode = ngx.HTTP_OK
         end
@@ -541,7 +580,7 @@ local function lookup_object(r)
 
     if r.meta then
         if dir and storage then
-            out['versions'] = common.get_local_object(storage .. '/' .. dir)
+            out['versions'] = common.get_local_object(storage .. '/objects/' .. dir)
         end
         exitcode = ngx.HTTP_OK
     else
@@ -591,6 +630,8 @@ if r.object and r.bucket then
         exitcode, out = lookup_object(r)
     elseif r.method == "POST" then
         exitcode, out = post_object(r)
+    elseif r.method == "DELETE" then
+        exitcode, out = delete_object(r)
     end
 elseif r.bucket then
     exitcode = 200
