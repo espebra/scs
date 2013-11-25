@@ -1,7 +1,8 @@
 local class = require "kidclass"
 local Configuration = require "configuration"
+local hash = require "hash"
+local ngx = require "ngx"
 local Request = class.new();
-local ngx = ngx
 
 ---------------
 -- Private API
@@ -167,6 +168,8 @@ function Request.Constructor(self)
         self.object_base64 = ngx.encode_base64(self.object)
         self.object_name_md5 = ngx.md5(self.object)
         self.dir = "/" .. self.bucket .. "/" .. get_directory_depth(self.object_name_md5) .. "/" .. self.object_base64
+
+        -- Calculate replica hosts here
     else
         -- Do not allow 0 character object names
         self.object = nil

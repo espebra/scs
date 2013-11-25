@@ -1,7 +1,7 @@
 local class = require "kidclass"
 local cjson = require "cjson"
+local ngx = require "ngx"
 local Configuration = class.new();
-local ngx = ngx
 
 ---------------
 -- Private API

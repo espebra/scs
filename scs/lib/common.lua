@@ -2,7 +2,6 @@ local M = {}
 
 local ngx = require "ngx"
 local cjson = require "cjson"
-local Flexihash = require 'Flexihash'
 local http = require "resty.http.simple"
 
 -- Function to fetch host status and update the cached status for all hosts
