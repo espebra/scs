@@ -6,18 +6,18 @@ path=$1
 bucket=$2
 
 if [ -x /usr/bin/md5sum ]; then
-    md5=$(md5sum $path | awk '{print $1}')
+    md5=$(md5sum "$path" | awk '{print $1}')
 fi
 
 if [ -x /sbin/md5 ]; then
-    md5=$(md5 $path | awk '{print $NF}')
+    md5=$(md5 "$path" | awk '{print $NF}')
 fi
 
 echo $path
 echo $md5
 
 if [ -f "${path}" ]; then
-    filename=$(basename $path)
+    filename=$(basename "$path")
     echo "Uploading $filename..."
     #curl -i -L -H 'expect: 100-continue' --data-binary "@${path}" "http://tindeimport.i.bitbit.net/${filename}"
     curl -i -L -H 'expect: 100-continue' -H "x-md5: $md5" --data-binary "@${path}" "http://${host}/${filename}?bucket=${bucket}"
