@@ -13,9 +13,12 @@ function M.hash_lookup(hash, haystack, count)
     -- TODO: Should store the hash map in memory to avoid having to create it
     -- for each request.
     local hash_map = Flexihash.New()
-    for _,value in pairs(haystack) do
-        ngx.log(ngx.DEBUG,"Adding value " .. value .. " of type " .. type(value) .. " to the hash")
-        hash_map:addTarget(value)
+    for value,weight in pairs(haystack) do
+        if not weight then
+            weight = 100
+        end
+        ngx.log(ngx.DEBUG,"Adding value " .. value .. " of type " .. type(value) .. " to the hash with weight " .. weight)
+        hash_map:addTarget(value, weight)
     end
 
     -- Lookup the hash in the hash map, return a table with the hits

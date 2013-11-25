@@ -253,7 +253,9 @@ function M.get_hosts(site)
 
         if match then
             ngx.log(ngx.INFO,"Caching: Host " .. host)
-            table.insert(hosts,host)
+            if h['weight'] then
+                hosts[host] = h['weight']
+            end
         end
     end
 
@@ -273,9 +275,11 @@ function M.get_sites()
     sites = {}
     local conf = Configuration()
     for host,h in pairs(conf.hosts) do
-        if not M.inTable(sites, h['site']) then
-            table.insert(sites,h['site'])
-            ngx.log(ngx.INFO,"Caching: Site " .. h['site'])
+        local site = h['site']
+        if not M.inTable(sites, site) then
+            sites[site] = 2
+            
+            ngx.log(ngx.INFO,"Caching: Site " .. site)
         end
     end
 

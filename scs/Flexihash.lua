@@ -40,7 +40,7 @@ end
 -- Add a target.
 -- @param string target
 --]]
-local function addTarget(this, target)
+local function addTarget(this, target, weight)
 	if this._targetToPositions[target] then
 		return false, "Target '" .. target .."' already exists."
 	end
@@ -48,7 +48,8 @@ local function addTarget(this, target)
 	this._targetToPositions[target] = {}
 
 	-- hash the target into multiple positions
-	for i = 0, this._replicas-1 do
+        local replicas = this._replicas * weight
+	for i = 0, replicas do
 		local position = this._hasher(target .. i)
 		this._positionToTarget[position] = target -- lookup
 		table.insert(this._targetToPositions[target], position) -- target removal
@@ -194,8 +195,7 @@ function New(...)
 	end
         hasher = Flexihash_Md5Hasher.hash
 
-	-- replicas = replicas or 64
-	replicas = replicas or 512
+	replicas = replicas or 16
 
 	local this = {
 		_replicas = replicas, --The number of positions to hash each target to.
