@@ -426,10 +426,14 @@ local function lookup_object(r)
     local version = r.version
 
     local out = {}
+    out['object'] = object
+    out['bucket'] = bucket
+    out['hosts'] = hosts
+    if version then
+        out['version'] = version
+    end
+
     if r.meta then
-        out['object'] = object
-        out['bucket'] = bucket
-        out['hosts'] = hosts
         if dir and storage then
             out['versions'] = common.get_local_object(storage .. '/' .. dir)
         end
