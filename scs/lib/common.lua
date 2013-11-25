@@ -22,25 +22,23 @@ function M.update_host_status(host, port)
     local key = "host " .. host
     local previous_status = cache.get_cache(key)
 
-    if previous_status == status then
+    if previous_status and status then
          -- No status change
-        if status then
-            ngx.log(ngx.DEBUG,"No change: Host " .. host .. " is still up!")
-        else
-            ngx.log(ngx.DEBUG,"No change: Host " .. host .. " is still unavailable!")
-        end
-    else
-         -- Status change
-        if status then
-            ngx.log(ngx.INFO,"Host " .. host .. " is now up!")
-        else
-            ngx.log(ngx.WARN,"Host " .. host .. " is now unavailable!")
-        end
-
-         -- Cache the new status
+        ngx.log(ngx.DEBUG,"No change: Host " .. host .. " is still up!")
+    elseif not previous_status and not status then
+         -- No status change
+        ngx.log(ngx.DEBUG,"No change: Host " .. host .. " is still unavailable!")
+    elseif not previous_status and status then
+        -- Status change
+        ngx.log(ngx.INFO,"Host " .. host .. " is now up!")
+        -- Cache the new status
+        cache.set_cache(key, status)
+    elseif previous_status and not status then
+        -- Status change
+        ngx.log(ngx.WARN,"Host " .. host .. " is now unavailable!")
+        -- Cache the new status
         cache.set_cache(key, status)
     end
-    
 end
 
 -- Function to randomize a table

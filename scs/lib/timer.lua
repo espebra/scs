@@ -1,26 +1,18 @@
 local M = {}
 
 local common = require "common"
+local cache = require "cache"
 local Configuration = require "configuration"
 local ngx = ngx
 
 function M.initiate_periodic_health_checks(delay)
-    local cache_key = "periodic_health_checks_started"
-    local cache = ngx.shared.cache
-    if cache then
-        local value, flags = cache:get(cache_key)
-        if value then
-            -- Periodic health checks are already running
-            return
-        end
+    local key = "periodic_health_checks_started"
+    local status = cache.get_cache(key)
+    if status then
+        -- Timers have already been started
+        return
     end
-
-    local succ, err, forcible = cache:set(cache_key, true)
-    if succ then
-        ngx.log(ngx.INFO, "Periodic health checks started")
-    else
-        ngx.log(ngx.ERR, "Unable to mark periodic health checks as started")
-    end
+    cache.set_cache(key, true)
 
     local conf = Configuration()
 
