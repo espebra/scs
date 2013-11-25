@@ -418,32 +418,51 @@ end
 --
 
 local function lookup_object(r)
+    local object = r.object
+    local bucket = r.bucket
+    local hosts = r.hosts
+    local storage = r.storage
+    local dir = r.dir
+    local version = r.version
+
     local out = {}
     if r.meta then
-        out['object'] = r.object
-        out['bucket'] = r.bucket
-        out['hosts'] = r.hosts
-        if r.dir and r.storage then
-            out['versions'] = common.get_local_object(r.storage .. '/' .. r.dir)
+        out['object'] = object
+        out['bucket'] = bucket
+        out['hosts'] = hosts
+        if dir and storage then
+            out['versions'] = common.get_local_object(storage .. '/' .. dir)
         end
+        exitcode = ngx.HTTP_OK
     else
-        ngx.log(ngx.DEBUG, 'object ' .. r.object .. ' in bucket ' .. r.bucket .. ' was not found locally. Check replica hosts')
+        ngx.log(ngx.DEBUG, 'object ' .. object .. ' in bucket ' .. bucket .. ' was not found locally. Check replica hosts')
         -- return 302, 404 or 503 (if no replica hosts are up)
-
-        for _,host in ipairs(r.hosts) do
-            if common.get_host_status(host) then
-                ngx.log(ngx.DEBUG,"FOO: host " .. host .. " is up")
+        local host = common.get_host_with_object(hosts, bucket, object, version)
+        if host == nil then
+            out['message'] = "All the replica hosts for object " .. object .. " in bucket " .. bucket .. " are unavailable. Please try again later."
+            exitcode = ngx.HTTP_SERVICE_UNAVAILABLE
+        elseif host == false then
+            if version then
+                out['message'] = "Version " .. version .. " of the object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts."
             else
-                ngx.log(ngx.DEBUG,"FOO: host " .. host .. " is down")
+                out['message'] = "The object " .. object .. " in bucket " .. bucket .. " does not exist locally or on any of the available replica hosts."
             end
+            exitcode = ngx.HTTP_NOT_FOUND
+        else
+            -- Rewrite to correct node
+            local port = hosts[host]['port']
+            local url = common.generate_url(host,port,object,bucket,version)
+            out['message'] = 'Redirecting GET request for object ' .. object .. ' in bucket ' .. bucket .. ' to ' .. url .. "."
+
+            ngx.header["Location"] = url
+            exitcode = ngx.HTTP_MOVED_TEMPORARILY
         end
     end
-    local exitcode = 200
     return exitcode, out
 end
 
 --local conf = Configuration()
-local exitcode = 500
+local exitcode = nil
 local out = {}
 
 local r = Request()

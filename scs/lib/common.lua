@@ -156,21 +156,24 @@ function M.http_request(host, port, headers, method, path, timeout)
 end
 
 ---- Check if an object exists on a remote host
---function M.object_exists_on_remote_host(host, port, bucket, object)
---    local method = "HEAD"
---    local path = "/" .. object .. "?bucket=" .. bucket
---    local headers = {}
---    local timeout = 1000
---    headers['user-agent'] = "scs internal"
---
---    local res = M.http_request(host, port, headers, method, path, timeout)
---    if res then
---        return host
---    else
---        return res
---    end
---end
---
+function M.object_exists_on_remote_host(host, port, bucket, object, version)
+    local method = "HEAD"
+    local path = "/" .. object .. "?bucket=" .. bucket
+    local headers = {}
+    local timeout = 1000
+    headers['user-agent'] = "scs internal"
+    if version then
+        headers['x-version'] = version
+    end
+
+    local res = M.http_request(host, port, headers, method, path, timeout)
+    if res then
+        return host
+    else
+        return res
+    end
+end
+
 ---- Create a consistent hash of the values given in a table
 --function M.create_hash_map(values)
 --    local hash_map = Flexihash.New()
@@ -180,17 +183,22 @@ end
 --    end
 --    return hash_map
 --end
---
---function M.generate_url(host, port, object, bucket)
---    local url
---    if port == 80 then
---        url = "http://" .. host .. "/" .. object .. "?bucket=" .. bucket
---    else
---        url = "http://" .. host .. ":" .. port .. "/" .. object .. "?bucket=" .. bucket
---    end
---    return url
---end
---
+
+function M.generate_url(host, port, object, bucket, version)
+    local url
+    if port == 80 then
+        url = "http://" .. host .. "/" .. object .. "?bucket=" .. bucket
+    else
+        url = "http://" .. host .. ":" .. port .. "/" .. object .. "?bucket=" .. bucket
+    end
+
+    if version then
+        url = url .. "&x-version=" .. version
+    end
+
+    return url
+end
+
 --function M.get_replicas_per_site()
 --    local conf = M.get_configuration()
 --    return conf.current.replicas_per_site
@@ -366,44 +374,45 @@ end
 --    end
 --    return dir 
 --end
---
----- Figure out exactly which host to use from the hosts given from the hash
----- ring lookup,
---function M.get_host_with_object(hosts, bucket, object)
---    -- Randomize the hosts table
---    hosts = M.randomize_table(hosts)
---
---    -- Return nil if no hosts are up
---    local status = nil
---
---    local port = M.get_bind_port()
---
---    -- For each host, check if the object is available. Return the first
---    -- host that has the object available.
---    local threads = {}
---    for i,host in pairs(hosts) do
---        -- Only test hosts that are up
---        if M.get_host_status(host) then
---            --ngx.log(ngx.ERR,"Checking host " .. host)
---            -- At least one host is up. Let's change the exit status to false
---            status = false
---            table.insert(threads,ngx.thread.spawn(M.object_exists_on_remote_host, host, port, bucket, object))
---        end
---    end
---
---    for i = 1, #threads do
---        local ok, res = ngx.thread.wait(threads[i])
---        if not ok then
---            ngx.log(ngx.ERR,"Thread " .. i .. " failed to run")
---        else
---            if res then
---                return res
---            end
---        end
---    end
---    return status
---end
---
+
+-- Figure out exactly which host to use from the hosts given from the hash
+-- ring lookup,
+function M.get_host_with_object(hosts, bucket, object, version)
+    -- Randomize the hosts table
+    hosts = M.randomize_table(hosts)
+
+    -- Return nil if no hosts are up
+    local status = nil
+
+    -- For each host, check if the object is available. Return the first
+    -- host that has the object available.
+    local threads = {}
+    for host,v in pairs(hosts) do
+        -- Only test hosts that are up
+        if M.get_host_status(host) then
+            -- At least one host is up. Let's change the exit status to false
+            status = false
+
+            local port = hosts[host]['port']
+            ngx.log(ngx.DEBUG,"Looking for object " .. object .. " in bucket " .. bucket .. " on host " .. host .. " port " .. port)
+            table.insert(threads,ngx.thread.spawn(M.object_exists_on_remote_host, host, port, bucket, object, version))
+        end
+    end
+
+    for i = 1, #threads do
+        local ok, res = ngx.thread.wait(threads[i])
+        if not ok then
+            ngx.log(ngx.ERR,"Thread " .. i .. " failed to run")
+        else
+            if res then
+                return res
+            end
+        end
+    end
+
+    return status
+end
+
 ---- Check if the request matches one of the hosts in the given table
 --function M.object_fits_on_this_host(hosts)
 --    for _,host in pairs(hosts) do

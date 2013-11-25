@@ -173,7 +173,14 @@ function Request.Constructor(self)
         self.dir = "/" .. self.bucket .. "/" .. get_directory_depth(self.object_name_md5) .. "/" .. self.object_base64
 
         -- Calculate replica hosts here
-        self.hosts = hash.get_object_replica_hosts(self.bucket, self.object, conf.replica_sites, conf.replicas_per_site)
+        local hosts = hash.get_object_replica_hosts(self.bucket, self.object, conf.replica_sites, conf.replicas_per_site)
+
+        -- Add more information about the replica hosts
+        local h = {}
+        for _,host in pairs(hosts) do
+            h[host] = conf['hosts'][host]
+        end
+        self.hosts = h
     else
         -- Do not allow 0 character object names
         self.object = nil
