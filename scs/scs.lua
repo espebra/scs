@@ -435,7 +435,8 @@ local function push_queue(r)
     out['object'] = object
     out['object_base64'] = object_base64
     local path = r.storage .. "/objects/" .. r.dir
-    out['path'] = path
+    out['base'] = r.storage .. "/objects"
+    out['path'] = r.dir
 
     for host,_ in pairs(hosts) do
         out['host'] = host
