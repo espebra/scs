@@ -73,7 +73,10 @@ end
 ---------------
 function Request.Constructor(self)
     local conf = Configuration()
-    self.storage = conf.storage
+    if conf then
+        self.cluster = conf.hosts
+        self.storage = conf.storage
+    end
     self.flags = 0
 
     local h = ngx.req.get_headers()

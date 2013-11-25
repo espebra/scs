@@ -93,24 +93,25 @@ local cjson = require 'cjson'
 ----     end
 ----     return exitcode
 ---- end
---
---local function lookup_cluster_status()
---    local exitcode = ngx.HTTP_OK
---    local out = {}
---    --out['conf'] = common.get_configuration()
---    out['sites'] = common.get_sites()
---    local hosts = {}
---    for i,host in ipairs(common.get_hosts()) do
---        local status = common.get_host_status(host)
---        local h = {}
---        h['host'] = host
---        h['status'] = status
---        table.insert(hosts, h)
---    end
---    out['hosts'] = hosts
---    return exitcode, out
---end
---
+
+local function lookup_cluster_status(r)
+    local exitcode = ngx.HTTP_OK
+    local out = {}
+    for host,h in pairs(r.cluster) do
+        ngx.log(ngx.DEBUG,"Checking " .. host)
+        local status = common.get_host_status(host)
+        local weight = h['weight']
+        local site = h['site']
+
+        local i = {}
+        i['status'] = status
+        i['weight'] = weight
+        i['site'] = site
+        out[host] = i
+    end
+    return exitcode, out
+end
+
 --local function lookup_object(r)
 --    local exitcode = ngx.HTTP_NOT_FOUND
 --    local out = {}
@@ -462,8 +463,9 @@ elseif r.bucket then
     exitcode = 200
     out['message'] = 'bucket only'
 else
-    exitcode = 200
-    out['message'] = 'no bucket and no object'
+    --exitcode = 200
+    --out['message'] = 'no bucket and no object'
+    exitcode, out = lookup_cluster_status(r)
 end
 
 local elapsed = ngx.now() - ngx.req.start_time()
