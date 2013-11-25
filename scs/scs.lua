@@ -3,6 +3,7 @@ local Request = require "request"
 --local Configuration = require "configuration"
 local timer = require "timer"
 local resty_md5 = require "resty.string.md5"
+local str = require "resty.string"
 
 --local http = require "libs.resty.http.simple"
 --local Flexihash = require 'libs.Flexihash'
@@ -424,6 +425,7 @@ local function post_object(r)
     local object_md5 = r.object_md5
     local object = r.object
     local object_base64 = r.object_base64
+    local version = ngx.time()
     local hosts = r.hosts
 
     if not object_md5 or not r.dir or not r.storage or not hosts then
@@ -431,7 +433,7 @@ local function post_object(r)
         ngx.exit(ngx.HTTP_BAD_REQUEST)
     end
 
-    local object_name_on_disk = ngx.time() .. "-" .. object_md5 .. ".data"
+    local object_name_on_disk = version .. "-" .. object_md5 .. ".data"
     local dir = r.storage .. "/" .. r.dir
 
     local out = {}
@@ -449,7 +451,7 @@ local function post_object(r)
             os.execute('mkdir --mode=0755 --parents ' .. dir)
         end
 
-        ----local md5 = resty_md5:new()
+        local md5 = resty_md5:new()
 
         ngx.req.read_body()
         local req_body_file = ngx.req.get_body_file()
@@ -473,17 +475,25 @@ local function post_object(r)
             if not block then 
                 break
             end
+            md5:update(block)
             realfile:write(block)
         end
         tmpfile:close()
         realfile:close()
+        local calculated_md5 = str.to_hex(md5:final())
+        md5:reset()
 
-        if not common.path_exists(dir .. "/" .. object_name_on_disk) then
+        if not object_md5 == calculated_md5 then
+            out['message'] = "The checksum of the uploaded file (" .. calculated_md5 .. ") is not the same as the client told us (" .. object_md5 .. ")"
+            exitcode = ngx.HTTP_BAD_REQUEST
+        elseif not common.path_exists(dir .. "/" .. object_name_on_disk) then
             ngx.log(ngx.ERR,'Failed to write object ' .. object .. ' in bucket ' .. bucket .. ' to local file system (' .. dir .. '/' .. object_name_on_disk .. ')')
             out['message'] = 'Failed to write object'
             exitcode = ngx.HTTP_INTERNAL_SERVER_ERROR
         else
             out['message'] = 'The object was uploaded'
+            out['md5'] = object_md5
+            out['version'] = version
 
             ngx.log(ngx.INFO,'The object ' .. object .. ' in bucket ' .. bucket .. ' was written successfully to local file system (' .. dir .. '/' .. object_name_on_disk .. ')')
             exitcode = ngx.HTTP_OK
@@ -602,7 +612,7 @@ ngx.status = exitcode
 -- We have some output for the client
 if out then
     ngx.header["content-type"] = "application/json"
-    ngx.print(cjson.encode(out))
+    ngx.say(cjson.encode(out))
 end
 
 return ngx.exit(exitcode)
