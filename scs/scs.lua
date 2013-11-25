@@ -439,13 +439,16 @@ local function push_queue(r)
     out['path'] = r.dir
 
     for host,_ in pairs(hosts) do
-        out['host'] = host
-
-        local filename = version .. "-" .. math.random(100,999)
-        file = io.open(dir .. "/" .. filename, 'w')
-        if file then
-            file:write(cjson.encode(out))
-            file:close()
+        if ngx.req.get_headers()["Host"] == host then
+            -- Pass
+        else
+            out['host'] = host
+            local filename = version .. "-" .. math.random(10000,99999)
+            file = io.open(dir .. "/" .. filename, 'w')
+            if file then
+                file:write(cjson.encode(out))
+                file:close()
+            end
         end
     end
 end

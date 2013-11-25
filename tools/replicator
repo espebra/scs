@@ -42,6 +42,11 @@ def main():
     files = sorted(files)
     #for file in files:
     #    print file
+
+    if len(files) == 0:
+        # No entries in the queue
+        sys.exit(0)
+ 
     selected = files[0]
     p = "%s/%s" % (queue_path, selected)
     q = read_file(p)
