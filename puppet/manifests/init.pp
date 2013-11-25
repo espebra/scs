@@ -34,21 +34,21 @@ File {
 file {
     '/srv':
         ensure => directory;
-    '/srv/scs':
+    '/srv/files':
         ensure  => directory,
         owner   => 'scs',
         group   => 'scs',
         require => [File['/srv'],User['scs']];
-    '/srv/scs/queue':
+    '/srv/files/queue':
         ensure  => directory,
         owner   => 'scs',
         group   => 'scs',
-        require => [File['/srv/scs'],User['scs']];
-    '/srv/scs/objects':
+        require => [File['/srv/files'],User['scs']];
+    '/srv/files/objects':
         ensure  => directory,
         owner   => 'scs',
         group   => 'scs',
-        require => [File['/srv/scs'],User['scs']];
+        require => [File['/srv/files'],User['scs']];
     '/etc/scs':
         ensure  => directory;
     '/srv/scs':
