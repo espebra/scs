@@ -1,5 +1,6 @@
 local class = require "kidclass"
 local cjson = require "cjson"
+local cache = require "cache"
 local ngx = require "ngx"
 local Configuration = class.new();
 
@@ -72,46 +73,33 @@ local function read_file(path)
     local f = nil
     local content = false
 
-    local cache = ngx.shared.cache
-    if cache then
-        content, flags = cache:get("file " .. path)
+    local key = "file " .. path
+    local result = cache.get_cache(key)
+    if result then
+        return result
     end
 
-    if content then
-        ngx.log(ngx.DEBUG,"Read contents of " .. path .. " from cache, " .. #content .. " bytes")
-    else
-        f = io.open(path, "r")
-        if f then
-            content = f:read("*all")
-            f:close()
-            local succ, err, forcible = cache:set("file " .. path, content)
-            if succ then
-                ngx.log(ngx.INFO,"Cached the content of " .. path .. ", " .. #content .. " bytes")
-            else
-                ngx.log(ngx.WARN,"Unable to cache the contents of " .. path)
-            end
+    f = io.open(path, "r")
+    if f then
+        content = f:read("*all")
+        f:close()
+        local value = cjson.decode(content)
+        if value then
+            cache.set_cache(key, value)
+            return value
         end
     end
-    return content
-end
 
-local function read_configuration_file(path)
-    local json = read_file(path)
-    local conf = cjson.decode(json)
-    if conf then
-        return conf
-    else
-        return false
-    end
+    return false
 end
 
 ---------------
 -- Public API
 ---------------
 function Configuration.Constructor(self)
-    local c = read_configuration_file("/etc/scs/common.conf")
-    local l = read_configuration_file("/etc/scs/local.conf")
-    local h = read_configuration_file("/etc/scs/hosts.conf")
+    local c = read_file("/etc/scs/common.conf")
+    local l = read_file("/etc/scs/local.conf")
+    local h = read_file("/etc/scs/hosts.conf")
 
     if c then
         self.replica_sites = c.replica_sites

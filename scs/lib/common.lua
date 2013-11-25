@@ -2,6 +2,8 @@ local M = {}
 
 local ngx = require "ngx"
 local cjson = require "cjson"
+local Configuration = require "configuration"
+local cache = require "cache"
 local http = require "resty.http.simple"
 
 -- Function to fetch host status and update the cached status for all hosts
@@ -17,35 +19,28 @@ function M.update_host_status(host, port)
     local timeout = 1000
     local status = M.http_request(host, port, headers, method, path, timeout)
 
-    local cache = ngx.shared.cache
-    if cache then
-        local cache_key = "host " .. host
-        local previous_status, flags = cache:get(cache_key)
+    local key = "host " .. host
+    local previous_status = cache.get_cache(key)
 
-        if previous_status == status then
-             -- No status change
-            if status then
-                ngx.log(ngx.DEBUG,"No change: Host " .. host .. " is still up!")
-            else
-                ngx.log(ngx.DEBUG,"No change: Host " .. host .. " is still unavailable!")
-            end
+    if previous_status == status then
+         -- No status change
+        if status then
+            ngx.log(ngx.DEBUG,"No change: Host " .. host .. " is still up!")
         else
-             -- Status change
-            if status then
-                ngx.log(ngx.INFO,"Host " .. host .. " is now up!")
-            else
-                ngx.log(ngx.WARN,"Host " .. host .. " is now unavailable!")
-            end
-
-             -- Cache the new status
-            local success, err, forcible = cache:set(cache_key, status)
-            if success then
-                ngx.log(ngx.DEBUG,"Cached host status for host " .. host)
-            else
-                ngx.log(ngx.ERR,"Failed to cache status for host " .. host .. ": " .. err)
-            end
+            ngx.log(ngx.DEBUG,"No change: Host " .. host .. " is still unavailable!")
         end
+    else
+         -- Status change
+        if status then
+            ngx.log(ngx.INFO,"Host " .. host .. " is now up!")
+        else
+            ngx.log(ngx.WARN,"Host " .. host .. " is now unavailable!")
+        end
+
+         -- Cache the new status
+        cache.set_cache(key, status)
     end
+    
 end
 
 -- Function to randomize a table
@@ -153,7 +148,7 @@ function M.http_request(host, port, headers, method, path, timeout)
         return nil
     end
 
-    ngx.log(ngx.INFO,"HTTP " .. method .. " request to " .. host .. ":" .. port .. path .. " returned " .. res.status)
+    ngx.log(ngx.DEBUG,"HTTP " .. method .. " request to " .. host .. ":" .. port .. path .. " returned " .. res.status)
 
     if res.status >= 200 and res.status < 300 then
         return true, res.body
@@ -230,68 +225,65 @@ end
 --    
 --    return hosts
 --end
---
----- Return a table containing the hosts in the configuration
---function M.get_hosts()
---    local cache = ngx.shared.cache
---    local cache_key = "hosts"
---    if cache then
---        local value, flags = cache:get(cache_key)
---        if value then
---            ngx.log(ngx.DEBUG,"Read " .. cache_key .. " from cache, " .. #value .. " bytes")
---            return cjson.decode(value)
---        end
---    end
---
---    hosts = {}
---    local conf = M.get_configuration()
---    for host,h in pairs(conf.current.hosts) do
---        table.insert(hosts,host)
---        ngx.log(ngx.INFO,"Caching: Host " .. host)
---    end
---
---    local value = cjson.encode(hosts)
---    local succ, err, forcible = cache:set(cache_key, value)
---    if succ then
---        ngx.log(ngx.INFO,"Cached " .. cache_key .. " successfully, " .. #value .. " bytes")
---    else
---        ngx.log(ngx.WARN,"Unable to cache " .. cache_key)
---    end
---
---    return hosts
---end
---
----- Return a table containing the sites in the configuration
---function M.get_sites()
---    local cache = ngx.shared.cache
---    local cache_key = "sites"
---    if cache then
---        local value, flags = cache:get(cache_key)
---        if value then
---            ngx.log(ngx.DEBUG,"Read " .. cache_key .. " from cache, " .. #value .. " bytes")
---            return cjson.decode(value)
---        end
---    end
---
---    sites = {}
---    local conf = M.get_configuration()
---    for host,h in pairs(conf.current.hosts) do
---        if not M.inTable(sites, h['site']) then
---            table.insert(sites,h['site'])
---            ngx.log(ngx.INFO,"Caching: Site " .. h['site'])
---        end
---    end
---
---    local value = cjson.encode(sites)
---    local succ, err, forcible = cache:set(cache_key, value)
---    if succ then
---        ngx.log(ngx.INFO,"Cached " .. cache_key .. " successfully, " .. #value .. " bytes")
---    else
---        ngx.log(ngx.WARN,"Unable to cache " .. cache_key)
---    end
---
---    return sites
---end
+
+-- Return a table containing the hosts in the configuration
+function M.get_hosts(site)
+    local site = site or nil
+
+    local key = "hosts"
+    if site then
+        key = "hosts " .. site
+    end
+
+    local result = cache.get_cache(key)
+    if result then
+        return result
+    end
+
+    hosts = {}
+    local conf = Configuration()
+    for host,h in pairs(conf.hosts) do
+        match = false
+
+        if site then
+            if site == h['site'] then
+                match = true
+            end
+        else
+            match = true
+        end
+
+        if match then
+            ngx.log(ngx.INFO,"Caching: Host " .. host)
+            table.insert(hosts,host)
+        end
+    end
+
+    cache.set_cache(key, hosts)
+
+    return hosts
+end
+
+-- Return a table containing the sites in the configuration
+function M.get_sites()
+    local key = "sites"
+    local result = cache.get_cache(key)
+    if result then
+        return result
+    end
+
+    sites = {}
+    local conf = Configuration()
+    for host,h in pairs(conf.hosts) do
+        if not M.inTable(sites, h['site']) then
+            table.insert(sites,h['site'])
+            ngx.log(ngx.INFO,"Caching: Site " .. h['site'])
+        end
+    end
+
+    cache.set_cache(key, sites)
+    return sites
+end
 
 ---- Return a table with the sites where a given object fits according to the
 ---- hash ring.

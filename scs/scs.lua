@@ -421,7 +421,8 @@ local function lookup_object(r)
     if r.meta then
         out['object'] = r.object
         out['bucket'] = r.bucket
-        if r.dir then
+        out['hosts'] = r.hosts
+        if r.dir and r.storage then
             out['versions'] = common.get_local_object(r.storage .. '/' .. r.dir)
         end
     else

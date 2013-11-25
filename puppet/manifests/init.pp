@@ -2,7 +2,7 @@ $ngx_version = '1.4.2.9'
 
 # Install some packages 
 $packages = [ 'git', 'rsync', 'python-devel', 'openssl-devel', 'pcre-devel',
-              'gcc', 'xinetd', 'perl-libwww-perl', 'lsof' ]
+              'gcc', 'xinetd', 'perl-libwww-perl', 'lsof', 'mlocate' ]
 
 package {
     $packages: ensure => installed;
