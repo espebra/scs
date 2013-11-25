@@ -7,6 +7,19 @@ local Request = class.new();
 ---------------
 -- Private API
 ---------------
+-- Function to randomize a table
+function randomize_table(t)
+    if t then
+        for i = #t, 2, -1 do
+            -- select a random number between 1 and i
+            local r = math.random(i)
+             -- swap the randomly selected item to position i
+            t[i], t[r] = t[r], t[i]
+        end
+    end
+    return t
+end
+
 local function get_directory_depth(md5)
     local dir = false
     if md5 then
@@ -174,6 +187,9 @@ function Request.Constructor(self)
 
         -- Calculate replica hosts here
         local hosts = hash.get_object_replica_hosts(self.bucket, self.object, conf.replica_sites, conf.replicas_per_site)
+
+        -- Put some randomization here
+        hosts = randomize_table(hosts)
 
         -- Add more information about the replica hosts
         local h = {}

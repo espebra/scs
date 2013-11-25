@@ -42,17 +42,17 @@ function M.update_host_status(host, port)
 end
 
 -- Function to randomize a table
-function M.randomize_table(t)
-    if t then
-        for i = #t, 2, -1 do
-            -- select a random number between 1 and i
-            local r = math.random(i)
-             -- swap the randomly selected item to position i
-            t[i], t[r] = t[r], t[i]
-        end
-    end
-    return t
-end
+--function M.randomize_table(t)
+--    if t then
+--        for i = #t, 2, -1 do
+--            -- select a random number between 1 and i
+--            local r = math.random(i)
+--             -- swap the randomly selected item to position i
+--            t[i], t[r] = t[r], t[i]
+--        end
+--    end
+--    return t
+--end
 
 -- Check if value exists in table, return key
 function M.inTable(tbl, item)
@@ -378,9 +378,6 @@ end
 -- Figure out exactly which host to use from the hosts given from the hash
 -- ring lookup,
 function M.get_host_with_object(hosts, bucket, object, version)
-    -- Randomize the hosts table
-    hosts = M.randomize_table(hosts)
-
     -- Return nil if no hosts are up
     local status = nil
 

@@ -486,8 +486,6 @@ local function post_object(r)
             exitcode = ngx.HTTP_OK
         end
     else
-        hosts = common.randomize_table(hosts)
-
         local host = nil
         for h,_ in pairs(hosts) do
             if common.get_host_status(h) then
