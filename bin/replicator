@@ -104,21 +104,26 @@ if __name__ == '__main__':
             if m:
                 queue.append(f)
 
+        last_run_sync = False
         if len(queue) == 0:
-            last_run_sync = False
+            pass
         else:
-            last_run_sync = True
             # Choose the oldest entry
             queue.sort()
             selected = queue[0]
             syslog.syslog(syslog.LOG_INFO, "Fetching job %s" % selected)
             p = "%s-processing" % selected
 
+            # From
+            f = "%s/%s" % (queue_path, selected)
+            # To
+            t = "%s/%s" % (queue_path, p)
+
             try:
-                os.rename(selected, p)
+                os.rename(f, t)
             except:
                 syslog.syslog(syslog.LOG_ERR, "Unable to rename %s to %s" % \
-                    (selected, p))
+                    (f,t))
             else:
                 syslog.syslog(syslog.LOG_INFO, "Renamed %s to %s" % \
                     (selected, p))
@@ -140,18 +145,19 @@ if __name__ == '__main__':
                 
                         (out, error) = pr.communicate()
                     except:
-                        syslog.syslog(syslog.LOG_ERR, "Replication to host %s failed: %s" % (host,p))
+                        syslog.syslog(syslog.LOG_ERR, "Replication to host %s failed: %s" % (host,t))
                     else:
                         if pr.returncode == 0:
-                            syslog.syslog(syslog.LOG_INFO, "Replication to host %s completed: %s" % (host,p))
+                            syslog.syslog(syslog.LOG_INFO, "Replication to host %s completed: %s" % (host,t))
+                            last_run_sync = True
                         else:
                             syslog.syslog(syslog.LOG_ERR, "Replication to host %s failed: %s. Error: cmd=%s, stdout=%s, stderr=%s, retcode=%s" % \
-                                (host, p, " ".join(cmd), out, error, pr.returncode))
+                                (host, t, " ".join(cmd), out, error, pr.returncode))
 
                     try:
-                        os.unlink(p)
+                        os.unlink(t)
                     except:
-                        syslog.syslog(syslog.LOG_ERR, "Unable to unlink queue file: %s" % p)
+                        syslog.syslog(syslog.LOG_ERR, "Unable to unlink queue file: %s" % t)
                     else:
-                        syslog.syslog(syslog.LOG_INFO, "Queue file removed: %s" % p)
+                        syslog.syslog(syslog.LOG_INFO, "Queue file removed: %s" % t)
 
