@@ -112,11 +112,16 @@ local function push_queue(r)
         else
             out['host'] = host
             local filename = version .. "-" .. math.random(10000,99999)
-            file = io.open(queue .. "/" .. filename, 'w')
+            file = io.open(queue .. "/" .. filename .. "-creating", 'w')
             if file then
                 file:write(cjson.encode(out))
                 file:close()
                 ngx.log(ngx.DEBUG,"Object " .. object .. " in bucket " .. bucket .. " added to the replicator queue as " .. filename)
+
+                -- Try to avoid race conditions
+                if not os.rename(queue .. "/" .. filename .. "-creating", queue .. "/" .. filename) then
+                    ngx.log(ngx.ERR,"Unable to rename " .. filename)
+                end
             else
                 ngx.log(ngx.ERR,"Unable to add object " .. object .. " in bucket " .. bucket .. " to the replicator queue as " .. filename)
             end
