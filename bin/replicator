@@ -125,13 +125,13 @@ def worker(cfg):
             
                     (out, error) = pr.communicate()
                 except:
-                    syslog.syslog(syslog.LOG_ERR, "Replication failed: %s" % p)
+                    syslog.syslog(syslog.LOG_ERR, "Replication to host %s failed: %s" % (host,p))
                 else:
                     if pr.returncode == 0:
-                        syslog.syslog(syslog.LOG_INFO, "Replication completed: %s" % p)
+                        syslog.syslog(syslog.LOG_INFO, "Replication to host %s completed: %s" % (host,p))
                     else:
-                        syslog.syslog(syslog.LOG_ERR, "Replication failed: %s. Error: cmd=%s, stdout=%s, stderr=%s, retcode=%s" % \
-                            (p, " ".join(cmd), out, error, pr.returncode))
+                        syslog.syslog(syslog.LOG_ERR, "Replication to host %s failed: %s. Error: cmd=%s, stdout=%s, stderr=%s, retcode=%s" % \
+                            (host, p, " ".join(cmd), out, error, pr.returncode))
 
                 try:
                     os.unlink(p)
