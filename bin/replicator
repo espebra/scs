@@ -123,34 +123,35 @@ if __name__ == '__main__':
                 syslog.syslog(syslog.LOG_INFO, "Renamed %s to %s" % \
                     (selected, p))
 
-            q = read_file("%s/%s" % (queue_path, p))
-            if q:
-                src = q['path'][1:]
-                host = q['host']
-                base = q['base']
+                q = read_file("%s/%s" % (queue_path, p))
+                if q:
+                    src = q['path'][1:]
+                    host = q['host']
+                    base = q['base']
 
-                # rsync -rRzSut "images/bd/5d/Y3Jvc2J5XzEwMDAyOTFfby5qcGc=" rsync://10.0.0.4/scs
-                cmd = ['rsync', '-rRzSut', "%s" % src, "rsync://%s/scs" % host]
-                try:
-                    pr = subprocess.Popen(cmd,
-                           cwd=base,
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE,
-                           shell=False)
-            
-                    (out, error) = pr.communicate()
-                except:
-                    syslog.syslog(syslog.LOG_ERR, "Replication to host %s failed: %s" % (host,p))
-                else:
-                    if pr.returncode == 0:
-                        syslog.syslog(syslog.LOG_INFO, "Replication to host %s completed: %s" % (host,p))
+                    # rsync -rRzSut "images/bd/5d/Y3Jvc2J5XzEwMDAyOTFfby5qcGc=" rsync://10.0.0.4/scs
+                    cmd = ['rsync', '-rRzSut', "%s" % src, "rsync://%s/scs" % host]
+                    try:
+                        pr = subprocess.Popen(cmd,
+                               cwd=base,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE,
+                               shell=False)
+                
+                        (out, error) = pr.communicate()
+                    except:
+                        syslog.syslog(syslog.LOG_ERR, "Replication to host %s failed: %s" % (host,p))
                     else:
-                        syslog.syslog(syslog.LOG_ERR, "Replication to host %s failed: %s. Error: cmd=%s, stdout=%s, stderr=%s, retcode=%s" % \
-                            (host, p, " ".join(cmd), out, error, pr.returncode))
+                        if pr.returncode == 0:
+                            syslog.syslog(syslog.LOG_INFO, "Replication to host %s completed: %s" % (host,p))
+                        else:
+                            syslog.syslog(syslog.LOG_ERR, "Replication to host %s failed: %s. Error: cmd=%s, stdout=%s, stderr=%s, retcode=%s" % \
+                                (host, p, " ".join(cmd), out, error, pr.returncode))
 
-                try:
-                    os.unlink(p)
-                except:
-                    syslog.syslog(syslog.LOG_ERR, "Unable to unlink queue file: %s" % p)
-                else:
-                    syslog.syslog(syslog.LOG_INFO, "Queue file removed: %s" % p)
+                    try:
+                        os.unlink(p)
+                    except:
+                        syslog.syslog(syslog.LOG_ERR, "Unable to unlink queue file: %s" % p)
+                    else:
+                        syslog.syslog(syslog.LOG_INFO, "Queue file removed: %s" % p)
+
