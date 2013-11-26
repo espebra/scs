@@ -151,7 +151,7 @@ service {
         enable     => true;
     'replicator':
         ensure     => true,
-        require    => [Package[$packages],File['/srv/files']],
+        require    => [Package[$packages],File['/srv/files'],File['/etc/init.d/replicator']],
         hasrestart => true,
         enable     => true;
 }
