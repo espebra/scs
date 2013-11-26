@@ -21,9 +21,6 @@ except ImportError:
 # Misc
 import re
 
-# Handle all nodes in separate threads to optimize
-from threading import Thread
-
 # To generate splay
 import random
 
@@ -32,9 +29,6 @@ import syslog
 
 config = "/etc/scs/local.conf"
 
-class TimeoutException(Exception): 
-    pass 
- 
 def read_file(path):
     if not os.path.exists(path):
         print "The file %s does not exist." % path
@@ -54,7 +48,7 @@ def read_file(path):
 
 
 def splay():
-    min = 0
+    min = 2
     max = 5
 
     # Seed here to avoid poor randomness between the processes after fork()
@@ -66,23 +60,42 @@ def splay():
     # Sleep with random interval first to spread the load
     return random.randint(min, max)
 
-# This is the function that will run as a thread towards each node
-def worker(cfg):
+             
+if __name__ == '__main__':
+    syslog.syslog(syslog.LOG_INFO,"Replicator: initializing")
 
-    # Return the parent
-    if os.fork():
-        return
+    # Read the configuration during startup.
+    from optparse import OptionParser
+    parser = OptionParser()
+    parser.add_option("-c", "--cfg", dest="cfg", default=config,
+                      help="Use configuration FILE", metavar="FILE")
+    (options, args) = parser.parse_args()
 
-    pid = os.getpid()
+    if os.path.isfile(options.cfg):
+        try:
+            f = open(options.cfg)
+            content = f.read()
+            cfg = json.loads(content)
+            f.close()
 
-    syslog.syslog(syslog.LOG_INFO,
-        "Replicator worker: Forked into PID %d" % (pid))
+        except IOError:
+            print >> sys.stderr, 'Configuration file Not Found: %s' % \
+                options.cfg
+  
+    else:
+        print >> sys.stderr, "Configuration file %s was not found" % options.cfg
+        exit(2)
 
     queue_path = cfg['queue']
     r = re.compile('^(\d+\-\d+)$')
+    last_run_sync = False
     while 1:
-        splay_time = splay()
-        time.sleep(splay_time)
+        if last_run_sync:
+            # Do not sleep after a previous sync
+            pass
+        else:
+            splay_time = splay()
+            time.sleep(splay_time)
 
         queue = []
         files = os.listdir(queue_path)
@@ -91,7 +104,10 @@ def worker(cfg):
             if m:
                 queue.append(f)
 
-        if len(queue) > 0:
+        if len(queue) == 0:
+            last_run_sync = False
+        else:
+            last_run_sync = True
             # Choose the oldest entry
             queue.sort()
             selected = queue[0]
@@ -138,34 +154,3 @@ def worker(cfg):
                     syslog.syslog(syslog.LOG_ERR, "Unable to unlink queue file: %s" % p)
                 else:
                     syslog.syslog(syslog.LOG_INFO, "Queue file removed: %s" % p)
-             
-if __name__ == '__main__':
-    syslog.syslog(syslog.LOG_INFO,"Replicator: initializing")
-
-    # Read the configuration during startup.
-    from optparse import OptionParser
-    parser = OptionParser()
-    parser.add_option("-c", "--cfg", dest="cfg", default=config,
-                      help="Use configuration FILE", metavar="FILE")
-    (options, args) = parser.parse_args()
-
-    if os.path.isfile(options.cfg):
-        try:
-            f = open(options.cfg)
-            content = f.read()
-            cfg = json.loads(content)
-            f.close()
-
-        except IOError:
-            print >> sys.stderr, 'Configuration file Not Found: %s' % \
-                options.cfg
-  
-    else:
-        print >> sys.stderr, "Configuration file %s was not found" % options.cfg
-        exit(2)
-
-    # Create on worker fork for each executor.
-    for i in range(0,cfg['replicator_workers']):
-        # For each worker, create a fork of this method
-        worker(cfg)
-
