@@ -97,6 +97,8 @@ if __name__ == '__main__':
             splay_time = splay()
             time.sleep(splay_time)
 
+        start_time = time.time()
+
         queue = []
         files = os.listdir(queue_path)
         for f in files:
@@ -110,32 +112,36 @@ if __name__ == '__main__':
         else:
             # Choose the oldest entry
             queue.sort()
-            selected = queue[0]
-            syslog.syslog(syslog.LOG_INFO, "Fetching job %s" % selected)
-            p = "%s-processing" % selected
+            o = queue[0]
+            elapsed = time.time()-start_time
+            syslog.syslog(syslog.LOG_INFO, "%s: Fetched job. Sorting took %.4fs." % (o, elapsed))
+            p = "%s-processing" % o
 
             # From
-            f = "%s/%s" % (queue_path, selected)
+            f = "%s/%s" % (queue_path, o)
             # To
             t = "%s/%s" % (queue_path, p)
 
             try:
                 os.rename(f, t)
             except:
-                syslog.syslog(syslog.LOG_ERR, "Unable to rename %s to %s" % \
-                    (f,t))
+                syslog.syslog(syslog.LOG_ERR, "%s: Unable to rename to %s" % (o,t))
             else:
-                syslog.syslog(syslog.LOG_INFO, "Renamed %s to %s" % \
-                    (selected, p))
+                syslog.syslog(syslog.LOG_INFO, "%s: Renamed to %s" % \
+                    (o, p))
 
-                q = read_file("%s/%s" % (queue_path, p))
+                q = read_file(t)
                 if q:
+                    #prefix = "%s/%s" % (q['bucket'],q['object'])
                     src = q['path'][1:]
                     host = q['host']
                     base = q['base']
+                    bucket = q['bucket']
+                    object_name = q['object']
 
                     # rsync -rRzSut "images/bd/5d/Y3Jvc2J5XzEwMDAyOTFfby5qcGc=" rsync://10.0.0.4/scs
                     cmd = ['rsync', '-rRzSut', "%s" % src, "rsync://%s/scs" % host]
+                    start_time = time.time()
                     try:
                         pr = subprocess.Popen(cmd,
                                cwd=base,
@@ -145,19 +151,21 @@ if __name__ == '__main__':
                 
                         (out, error) = pr.communicate()
                     except:
-                        syslog.syslog(syslog.LOG_ERR, "Replication to host %s failed: %s" % (host,t))
+                        syslog.syslog(syslog.LOG_ERR, "%s: Replication to host %s failed: %s/%s" % (p,host,p))
                     else:
                         if pr.returncode == 0:
-                            syslog.syslog(syslog.LOG_INFO, "Replication to host %s completed: %s" % (host,t))
+                            elapsed = time.time()-start_time
+                            syslog.syslog(syslog.LOG_INFO, "%s: Replication to host %s completed in %.2fs: Bucket: %s, object: %s" % (p,host,elapsed,bucket,object_name))
                             last_run_sync = True
                         else:
-                            syslog.syslog(syslog.LOG_ERR, "Replication to host %s failed: %s. Error: cmd=%s, stdout=%s, stderr=%s, retcode=%s" % \
-                                (host, t, " ".join(cmd), out, error, pr.returncode))
+                            syslog.syslog(syslog.LOG_ERR, "%s: Replication to host %s failed: %s. Error: cmd=%s, stdout=%s, stderr=%s, retcode=%s" % \
+                                (p, host, t, " ".join(cmd), out, error, \
+                                pr.returncode))
 
                     try:
                         os.unlink(t)
                     except:
-                        syslog.syslog(syslog.LOG_ERR, "Unable to unlink queue file: %s" % t)
+                        syslog.syslog(syslog.LOG_ERR, "%s: Unable to unlink queue file: %s" % (p,t))
                     else:
-                        syslog.syslog(syslog.LOG_INFO, "Queue file removed: %s" % t)
+                        syslog.syslog(syslog.LOG_INFO, "%s: Queue file removed: %s" % (p,t))
 
