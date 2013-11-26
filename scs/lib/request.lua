@@ -88,7 +88,8 @@ function Request.Constructor(self)
     local conf = Configuration()
     if conf then
         self.cluster = conf.hosts
-        self.storage = conf.storage
+        self.objects = conf.objects
+        self.queue = conf.queue
     end
     self.flags = 0
 

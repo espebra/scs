@@ -9,12 +9,12 @@ local function rewrite_request(r)
     local internal = r.internal
     local object_base64 = r.object_base64
     local dir = r.dir
-    local storage = r.storage
+    local objects = r.objects
 
     local version = 0
     local md5 = false
 
-    local versions = common.get_local_object(storage .. dir)
+    local versions = common.get_local_object(objects .. "/" .. dir)
     for _,v in ipairs(versions) do
          if r.version then
              -- The client requests a spesific version

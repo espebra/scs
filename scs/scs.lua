@@ -425,17 +425,18 @@ local function push_queue(r)
     local hosts = r.hosts
     local object_base64 = r.object_base64
     local version = ngx.time()
-    local dir = r.storage .. "/queue/"
-    if not os.rename(dir, dir) then
-        os.execute('mkdir --mode=0755 --parents ' .. dir)
+    local queue = r.queue
+    if not os.rename(queue, queue) then
+        ngx.log(ngx.DEBUG,"Trying to create directory " .. queue)  
+        os.execute('mkdir --mode=0755 --parents ' .. queue)
     end
 
     local out = {}
     out['bucket'] = bucket
     out['object'] = object
     out['object_base64'] = object_base64
-    local path = r.storage .. "/objects/" .. r.dir
-    out['base'] = r.storage .. "/objects"
+    local path = r.objects .. "/" .. r.dir
+    out['base'] = r.objects
     out['path'] = r.dir
 
     for host,_ in pairs(hosts) do
@@ -444,10 +445,13 @@ local function push_queue(r)
         else
             out['host'] = host
             local filename = version .. "-" .. math.random(10000,99999)
-            file = io.open(dir .. "/" .. filename, 'w')
+            file = io.open(queue .. "/" .. filename, 'w')
             if file then
                 file:write(cjson.encode(out))
                 file:close()
+                ngx.log(ngx.DEBUG,"Object " .. object .. " in bucket " .. bucket .. " added to the replicator queue as " .. filename)
+            else
+                ngx.log(ngx.ERR,"Unable to add object " .. object .. " in bucket " .. bucket .. " to the replicator queue as " .. filename)
             end
         end
     end
@@ -468,7 +472,7 @@ local function post_object(r)
     local version = ngx.time()
     local hosts = r.hosts
 
-    if not object_md5 or not r.dir or not r.storage or not hosts then
+    if not object_md5 or not r.dir or not r.objects or not hosts then
         ngx.log(ngx.ERR,"Missing information")
         ngx.exit(ngx.HTTP_BAD_REQUEST)
     end
@@ -486,7 +490,7 @@ local function post_object(r)
     if common.object_fits_on_this_host(hosts) then
         -- local upload is ok
 
-        local dir = r.storage .. "/objects/" .. r.dir 
+        local dir = r.objects .. "/" .. r.dir 
         if not os.rename(dir, dir) then
             os.execute('mkdir --mode=0755 --parents ' .. dir)
         end
@@ -570,7 +574,7 @@ local function lookup_object(r)
     local object = r.object
     local bucket = r.bucket
     local hosts = r.hosts
-    local storage = r.storage
+    local objects = r.objects
     local dir = r.dir
     local version = r.version
 
@@ -583,8 +587,8 @@ local function lookup_object(r)
     end
 
     if r.meta then
-        if dir and storage then
-            out['versions'] = common.get_local_object(storage .. '/objects/' .. dir)
+        if dir and objects then
+            out['versions'] = common.get_local_object(objects .. '/' .. dir)
         end
         exitcode = ngx.HTTP_OK
     else

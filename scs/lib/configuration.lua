@@ -107,7 +107,8 @@ function Configuration.Constructor(self)
     end
 
     if l then
-        self.storage = l.storage
+        self.objects = l.objects
+        self.queue = l.queue
     end
 
     if h then
