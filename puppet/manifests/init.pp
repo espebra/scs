@@ -146,12 +146,12 @@ service {
         enable     => true;
     'scs':
         ensure     => true,
-        require    => [Package[$packages],File['/srv/files']],
+        require    => [Package[$packages],File['/srv/files'],File['/etc/scs/local.conf']],
         hasrestart => true,
         enable     => true;
     'replicator':
         ensure     => true,
-        require    => [Package[$packages],File['/srv/files'],File['/etc/init.d/replicator']],
+        require    => [Package[$packages],File['/srv/files'],File['/etc/init.d/replicator'],File['/etc/scs/local.conf']],
         hasrestart => true,
         enable     => true;
 }
