@@ -85,16 +85,22 @@ function M.get_local_object(dir)
 
     local entry, versions, popen = nil, {}, io.popen
     if M.path_exists(dir) then
-        for entry in popen('find ' .. dir .. ' -type f -printf "%s\t%f\n" | sort -nr'):lines() do
-            local m, err = ngx.re.match(entry, "^([0-9]+)\t([0-9]+)-([a-f0-9]+).([a-z]+)$","j")
+        for entry in popen('find ' .. dir .. ' -type f -printf "%f\t%s\n" | sort -nr'):lines() do
+            local m, err = ngx.re.match(entry, "^([0-9]+)-([a-f0-9]+).([a-z]+)\t([0-9]+)$","j")
             if m then
                 if #m == 4 then
                     local n = {}
 
-                    n['size'] = tonumber(m[1])
-                    n['version'] = tonumber(m[2])
-                    n['md5'] = m[3]
-                    n['type'] = m[4]
+                    n['version'] = tonumber(m[1])
+                    n['md5'] = m[2]
+                    n['type'] = m[3]
+                    n['size'] = tonumber(m[4])
+
+                    if n['type'] == 'ts' then
+                        -- Do not serve files older than the most recent tombstone
+                        ngx.log(ngx.DEBUG,"Found " .. #versions .. " versions locally in " .. dir .. " more recent than the tombstone")
+                        return versions
+                    end
 
                     if M.verify_md5(n['md5']) then
                         table.insert(versions, n)

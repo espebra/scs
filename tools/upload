@@ -1,6 +1,6 @@
 #!/bin/bash
 
-host="10.0.0.2"
+host="10.0.0.3"
 
 path=$1
 bucket=$2
