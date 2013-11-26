@@ -2,7 +2,8 @@ $ngx_version = '1.4.2.9'
 
 # Install some packages 
 $packages = [ 'git', 'rsync', 'python-devel', 'openssl-devel', 'pcre-devel',
-              'gcc', 'xinetd', 'perl-libwww-perl', 'lsof', 'mlocate' ]
+              'gcc', 'xinetd', 'perl-libwww-perl', 'lsof', 'mlocate',
+              'strace' ]
 
 package {
     $packages: ensure => installed;
@@ -77,6 +78,10 @@ file {
         ensure  => present,
         source  => '/vagrant/scs/conf/rsyncd.conf',
         notify  => Service['xinetd'];
+    '/etc/init.d/replicator':
+        ensure  => link,
+        source  => '/vagrant/bin/replicator.init',
+        notify  => Service['scs'];
     '/etc/init.d/scs':
         ensure  => link,
         source  => '/vagrant/scs/conf/scs.init',
@@ -140,6 +145,11 @@ service {
         hasrestart => true,
         enable     => true;
     'scs':
+        ensure     => true,
+        require    => [Package[$packages],File['/srv/files']],
+        hasrestart => true,
+        enable     => true;
+    'replicator':
         ensure     => true,
         require    => [Package[$packages],File['/srv/files']],
         hasrestart => true,

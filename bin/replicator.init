@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# chkconfig: 2345 55 25
+#
+#       /etc/rc.d/init.d/
+#
+
+start() {
+        echo "Starting"
+        nohup /vagrant/bin/replicator > /var/log/scs/replicator.out 2>&1 &
+        return
+}
+
+stop() {
+        echo "Shutting down"
+        pkill -f "/usr/bin/python /vagrant/bin/replicator"
+        return
+}
+
+case "$1" in
+    start)
+        $0 status || start
+        ;;
+    stop)
+        $0 status && stop
+        ;;
+    status)
+        pgrep -f "/usr/bin/python /vagrant/bin/replicator" > /dev/null
+        ;;
+    restart)
+        stop
+        sleep 1
+        start
+        ;;
+    reload)
+
+        [ -f /var/lock/subsys/ ] && restart || :
+        ;;
+    probe)
+
+        ;;
+    *)
+        echo "Usage:  {start|stop|status|reload|restart[|probe]"
+        exit 1
+        ;;
+esac
+exit $?
+

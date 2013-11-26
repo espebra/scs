@@ -1,0 +1,169 @@
+#!/usr/bin/python
+#
+
+import sys
+import time
+from operator import itemgetter
+import os.path
+import subprocess
+#import cProfile
+
+#cProfile.run('foo()')
+
+# Configuration
+
+try:
+    import json
+except ImportError:
+    print >> sys.stderr, "Error importing json, is python-simplejson installed?"
+    sys.exit(1)
+
+# Misc
+import re
+
+# Handle all nodes in separate threads to optimize
+from threading import Thread
+
+# To generate splay
+import random
+
+# For logging
+import syslog
+
+config = "/etc/scs/local.conf"
+
+class TimeoutException(Exception): 
+    pass 
+ 
+def read_file(path):
+    if not os.path.exists(path):
+        print "The file %s does not exist." % path
+        sys.exit(2)
+
+    with open(path, 'r') as f:
+        content = f.read()
+
+    try:
+        c = json.loads(content)
+    except:
+        print "Unable to parse the content in %s" % path
+        sys.exit(2)
+    else:
+        return c
+
+    return False
+
+
+def splay():
+    min = 0
+    max = 10
+
+    # Seed here to avoid poor randomness between the processes after fork()
+    # Using be os.urandom(1) as seed seems to generate a higher grade of
+    # randomness (but it is probably more expensive as well).
+    #random.seed(os.getpid())
+    random.seed(os.urandom(1))
+
+    # Sleep with random interval first to spread the load
+    return random.randint(min, max)
+
+# This is the function that will run as a thread towards each node
+def worker(cfg):
+
+    # Return the parent
+    if os.fork():
+        return
+
+    pid = os.getpid()
+
+    syslog.syslog(syslog.LOG_INFO,
+        "Replicator worker: Forked into PID %d" % (pid))
+
+    queue_path = cfg['queue']
+    r = re.compile('^(\d+\-\d+)$')
+    while 1:
+        splay_time = splay()
+        time.sleep(splay_time)
+
+        queue = []
+        files = os.listdir(queue_path)
+        for f in files:
+            m = r.match(f)
+            if m:
+                queue.append(f)
+
+        if len(queue) > 0:
+            # Choose the oldest entry
+            queue.sort()
+            selected = queue[0]
+            syslog.syslog(syslog.LOG_INFO, "Fetching job %s" % selected)
+            p = "%s-processing" % selected
+
+            try:
+                os.rename(selected, p)
+            except:
+                syslog.syslog(syslog.LOG_ERR, "Unable to rename %s to %s" % \
+                    (selected, p))
+            else:
+                syslog.syslog(syslog.LOG_INFO, "Renamed %s to %s" % \
+                    (selected, p))
+
+            q = read_file("%s/%s" % (queue_path, p))
+            if q:
+                src = q['path'][1:]
+                host = q['host']
+                base = q['base']
+
+                # rsync -rRzSut "images/bd/5d/Y3Jvc2J5XzEwMDAyOTFfby5qcGc=" rsync://10.0.0.4/scs
+                cmd = ['rsync', '-rRzSut', "%s" % src, "rsync://%s/scs" % host]
+                pr = subprocess.Popen(cmd,
+                       cwd=base,
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE,
+                       shell=False)
+            
+                (out, error) = pr.communicate()
+            
+                if pr.returncode == 0:
+                    syslog.syslog(syslog.LOG_INFO, "Replication completed: %s" % p)
+                else:
+                    syslog.syslog(syslog.LOG_ERR, "Replication failed: %s. Error: cmd=%s, stdout=%s, stderr=%s, retcode=%s" % \
+                        (p, " ".join(cmd), out, error, pr.returncode))
+
+                try:
+                    os.unlink(p)
+                except:
+                    syslog.syslog(syslog.LOG_ERR, "Unable to unlink queue file: %s" % p)
+                else:
+                    syslog.syslog(syslog.LOG_INFO, "Queue file removed: %s" % p)
+             
+if __name__ == '__main__':
+    syslog.syslog(syslog.LOG_INFO,"Replicator: initializing")
+
+    # Read the configuration during startup.
+    from optparse import OptionParser
+    parser = OptionParser()
+    parser.add_option("-c", "--cfg", dest="cfg", default=config,
+                      help="Use configuration FILE", metavar="FILE")
+    (options, args) = parser.parse_args()
+
+    if os.path.isfile(options.cfg):
+        try:
+            f = open(options.cfg)
+            content = f.read()
+            cfg = json.loads(content)
+            f.close()
+
+        except IOError:
+            print >> sys.stderr, 'Configuration file Not Found: %s' % \
+                options.cfg
+  
+    else:
+        print >> sys.stderr, "Configuration file %s was not found" % options.cfg
+        exit(2)
+
+    # Create on worker fork for each executor.
+    for i in range(0,cfg['replicator_workers']):
+        # For each worker, create a fork of this method
+        worker(cfg)
+

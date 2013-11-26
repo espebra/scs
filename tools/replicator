@@ -28,13 +28,17 @@ def main():
 
     c = read_file(cfg)
     
-    if not 'storage' in c:
-        print "'storage' is not specified in %s" % cfg
+    if not 'queue' in c:
+        print "'queue' is not specified in %s" % cfg
+        sys.exit(2)
+
+    if not 'objects' in c:
+        print "'objects' is not specified in %s" % cfg
         sys.exit(2)
     
     # Directories
-    queue_path = "%s/queue/" % c['storage']
-    objects_path = "%s/objects/" % c['storage']
+    queue_path = c['queue']
+    objects_path = c['objects']
     
     # Queue
     queue = []
