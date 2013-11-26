@@ -56,7 +56,7 @@ def read_file(path):
 
 def splay():
     min = 0
-    max = 10
+    max = 5
 
     # Seed here to avoid poor randomness between the processes after fork()
     # Using be os.urandom(1) as seed seems to generate a higher grade of
