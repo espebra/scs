@@ -158,6 +158,9 @@ local function delete_object(r)
             ts:close()
             exitcode = ngx.HTTP_OK
             ngx.log(ngx.INFO,"Added tombstone for object " .. object .. " in bucket " .. bucket .. ", " .. p)
+
+            -- Add the object to the relication short list queue
+            push_queue(r)
         else
             ngx.log(ngx.ERR,"Unable to write tombstone for object " .. object .. " in bucket " .. bucket .. ", " .. p)
         end
