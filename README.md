@@ -17,10 +17,9 @@ Lua, based on the OpenResty web application server.
 ## Design principles
 
 * Keep it simple.
-* Requests can be sent to any of the hosts. The client will be redirected to one of the replica hosts for that specific request. This will provide high availability when used with anycast and/or IP failover.
-* Automatic rebalancing if hosts are down is not necessary. It is sufficient to rebalance when hosts are added and/or removed from the configuration file.
+* Requests can be sent to any of the hosts in the cluster. The client will be redirected to one of the replica hosts for that specific request. This will provide high availability and avoid bottlenecks when used with anycast and/or IP failover.
 * Stateless is robust.
-* It must be easy to export the objects from scs as regular files allowing them to be imported into another storage solutions.
+* Make sure it's easy to export the objects from scs as regular files allowing them to be imported into other storage solutions. Storage lock-in is not acceptable.
 
 
 ## Installation
