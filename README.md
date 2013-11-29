@@ -95,10 +95,10 @@ Or, using the fqdn to specify bucket:
 
 ## Roadmap
 
-* Authentication
+* Authentication.
 * Lazy replication daemon to scan through all objects (not just the queue) and perform replication.
 * Reaper daemon to quarantine files with invalid md5 checksums.
-* API compability with some of the most used features in S3
+* API compability with some of the most used features in S3.
 
 
 ## Status
