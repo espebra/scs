@@ -31,12 +31,18 @@ To get a development/testing environment up and running:
     # cd scs
     # vagrant up
 
-A cluster with virtual machines running scs will be installed and configured correctly. When the build process is complete, try out the examples below.
+A cluster with virtual machines running scs on CentOS 6 will be configured and started. The three hosts in the development environment will get the names and IPv4 addresses:
+
+* scs1.local -> 10.0.0.2
+* scs2.local -> 10.0.0.3
+* scs3.local -> 10.0.0.4
+
+Now that the build process is complete, try out the examples below.
 
 
 ## Example usage
 
-The commands below can be copy/pasted directly to write, read and delete an object from your development environment.
+The commands below can be copy/pasted directly to write, read and delete an object from your development environment. The requests are being directed to 10.0.0.4, but they can be sent to any of the hosts.
 
 
 ### Write object

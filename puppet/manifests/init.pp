@@ -3,7 +3,7 @@ $ngx_version = '1.4.2.9'
 # Install some packages 
 $packages = [ 'git', 'rsync', 'python-devel', 'openssl-devel', 'pcre-devel',
               'gcc', 'xinetd', 'perl-libwww-perl', 'lsof', 'mlocate',
-              'strace' ]
+              'strace', 'avahi' ]
 
 package {
     $packages: ensure => installed;
@@ -161,6 +161,11 @@ service {
     'iptables':
         ensure     => true,
         require    => File['/etc/sysconfig/iptables'],
+        hasrestart => true,
+        enable     => true;
+    'avahi':
+        ensure     => true,
+        require    => Package[$packages],
         hasrestart => true,
         enable     => true;
 }
