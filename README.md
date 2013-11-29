@@ -46,7 +46,7 @@ The following will upload the content of the file *sourcefile* to the bucket *so
     # md5=$(md5sum sourcefile | awk '{print $1}')
     # curl -s -L -H "expect: 100-continue" -H "x-md5: $md5" --data-binary "@sourcefile" "http://10.0.0.4/targetfile?bucket=somebucket" | python -mjson.tool
 
-To make it a bit easier to handle different buckets in the development environment, the bucket can be specified as a parameter as shown above. In production environments, this parameter may be given as the first part of the fqdn which is used:
+To make it a bit easier to handle different buckets in the development environment, the bucket can be specified as a parameter ''bucket'' in the URL as shown above. In production environments, the bucket is being read from the server name used in the request:
 
     # md5=$(md5sum /path/to/sourcefile | awk '{print $1}')
     # curl -s -L -H "expect: 100-continue" -H "x-md5: $md5" --data-binary "@/path/to/sourcefile" "http://somebucket.scs.example.com/targetfile"
