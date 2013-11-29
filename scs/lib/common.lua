@@ -291,7 +291,8 @@ function M.get_sites()
     for host,h in pairs(conf.hosts) do
         local site = h['site']
         if not M.inTable(sites, site) then
-            sites[site] = 2
+            --  Default weight is 100. Currently this is static.
+            sites[site] = 100
             
             ngx.log(ngx.INFO,"Caching: Site " .. site)
         end
