@@ -163,7 +163,7 @@ service {
         require    => File['/etc/sysconfig/iptables'],
         hasrestart => true,
         enable     => true;
-    'avahi':
+    'avahi-daemon':
         ensure     => true,
         require    => Package[$packages],
         hasrestart => true,
