@@ -23,11 +23,9 @@ Lua, based on the OpenResty web application server.
 
 * Authentication
 * Cluster syncronization
-
 * Replication
  * At host recovery
  * When adding and removing hosts
-
 * API compability with some of the features in S3
 
 ## Installation
