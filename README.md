@@ -66,7 +66,7 @@ Or, using the fqdn to specify bucket:
 
 Extra information about the object:
 
-    # curl -L "http://10.0.0.3/targetfile?bucket=somebucket?x-meta"
+    # curl -L "http://10.0.0.3/targetfile?bucket=somebucket&x-meta"
 
 Objects are stored as versions given in mtime. A spesific version of the object can be read using:
 
