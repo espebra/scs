@@ -5,11 +5,12 @@ Lua, based on the OpenResty web application server.
 
 ## Features
 
-* Quite fast
+* Fast
+* Highly scalable
 * Stateless
 * Non-SPOF
-* Multi location
-* Eventual consistent (WIP)
+* Active/active multi location
+* Eventual consistent
 
 ## Design principles
 
