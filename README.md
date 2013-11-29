@@ -46,10 +46,10 @@ The following will upload the content of the file *sourcefile* to the bucket *so
     # md5=$(md5sum sourcefile | awk '{print $1}')
     # curl -s -L -H "expect: 100-continue" -H "x-md5: $md5" --data-binary "@sourcefile" "http://10.0.0.4/targetfile?bucket=somebucket" | python -mjson.tool
 
-To make it a bit easier to handle different buckets in the development environment, the bucket can be specified as a parameter ''bucket'' in the URL as shown above. In production environments, the bucket is being read from the server name used in the request:
+To make it a bit easier to handle different buckets in the development environment, the bucket can be specified as a parameter ''bucket'' in the URL as shown above. In production environments, the bucket is being read from the server name used in the request. The two URLs below are equally handled given that somebucket.scs.example.com points to 10.0.0.4:
 
-    # md5=$(md5sum /path/to/sourcefile | awk '{print $1}')
-    # curl -s -L -H "expect: 100-continue" -H "x-md5: $md5" --data-binary "@/path/to/sourcefile" "http://somebucket.scs.example.com/targetfile"
+    # http://10.0.0.4/targetfile?bucket=somebucket
+    # http://somebucket.scs.example.com/targetfile
 
 When the upload is complete, an entry is made in */srv/files/queue/* marking this object as changed. A replicator daemon monitors this directory and will replicate the objects found to the other replica hosts these objects should be replicated to according to their hash.
 
