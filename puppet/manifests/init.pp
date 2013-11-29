@@ -101,6 +101,10 @@ file {
     '/usr/local/sbin/p':
         source  => '/vagrant/puppet/files/puppet/p',
         mode    => 555;
+    '/etc/sysconfig/iptables':
+        ensure  => present,
+        source  => '/vagrant/puppet/files/firewall/iptables',
+        notify  => Service['iptables'];
 }
 
 # Building openresty
@@ -152,6 +156,11 @@ service {
     'replicator':
         ensure     => true,
         require    => [Package[$packages],File['/srv/files'],File['/etc/init.d/replicator'],File['/etc/scs/local.conf']],
+        hasrestart => true,
+        enable     => true;
+    'iptables':
+        ensure     => true,
+        require    => File['/etc/sysconfig/iptables'],
         hasrestart => true,
         enable     => true;
 }
