@@ -38,6 +38,8 @@ To get a development/testing environment up and running:
     # cd scs
     # vagrant up
 
+A cluster with virtual machines running scs will be installed and configured correctly. When the build process is complete, try out the examples below.
+
 ## Example usage
 
 ### Write object
