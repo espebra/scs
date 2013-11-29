@@ -36,6 +36,8 @@ A cluster with virtual machines running scs will be installed and configured cor
 
 ## Example usage
 
+The commands below can be copy/pasted directly to write, read and delete an object from your development environment.
+
 
 ### Write object
 
