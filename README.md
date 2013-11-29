@@ -19,6 +19,7 @@ Lua, based on the OpenResty web application server.
 * Requests can be sent to any of the hosts. The client will be redirected to one of the replica hosts for that specific request. This will provide high availability when used with anycast and/or IP failover.
 * Automatic rebalancing if hosts are down is not necessary. It is sufficient to rebalance when hosts are added and/or removed from the configuration file.
 * Stateless is robust.
+* It must be easy to export the objects from scs as regular files allowing them to be imported into another storage solutions.
 
 
 ## Installation
