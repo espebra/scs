@@ -8,9 +8,8 @@ Lua, based on the OpenResty web application server.
 
 * Fast.
 * Scalable.
-* Stateless.
-* Non-SPOF.
 * Active/active multi location.
+* Non-SPOF.
 * Eventually consistent.
 
 
@@ -18,7 +17,7 @@ Lua, based on the OpenResty web application server.
 
 * Keep it simple.
 * Requests can be sent to any of the hosts in the cluster. The client will be redirected to one of the replica hosts for that specific request. This will provide high availability and avoid bottlenecks when used with anycast and/or IP failover.
-* Stateless is robust.
+* Stateless where possible.
 * Make sure it's easy to export the objects from scs as regular files allowing them to be imported into other storage solutions. Storage lock-in is not acceptable.
 
 
