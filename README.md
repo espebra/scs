@@ -41,7 +41,7 @@ To get a development/testing environment up and running:
 
 ## Example usage
 
-### Upload
+### Write object
 
 The following will upload the content of the file *sourcefile* to the bucket *somebucket* with the file name *targetfile*. Targetfile may contain the character /, which will make it look like a directory structure. The request can be sent to all of the hosts in the cluster, and the result will be the same:
 
@@ -57,7 +57,7 @@ The filename will be base64 encoded to allow weird characters, and will be store
 
 The file *targetfile* is stored on the number of replica hosts and sites specified in */etc/scs/common.conf*. 
 
-### Download
+### Read object
 
 The following will download *targetfile* from the bucket *somebucket*. The request can be sent to all of the hosts in the cluster, and the result will be the same:
 
@@ -67,9 +67,16 @@ Or, using the fqdn to specify bucket:
 
     # curl -L "http://somebucket.scs.example.com/targetfile"
 
-What happens is that the host that handles the request will lookup which hosts actually have *targetfile* on their local file systems (replica hosts), and redirect (302) your client to one of these - quite randomly.
+Extra information about the object:
 
-### DELETE
+    # curl -L "http://10.0.0.3/targetfile?bucket=somebucket?x-meta"
+
+Objects are stored as versions given in mtime. A spesific version of the object can be read using:
+
+    # curl -L "http://10.0.0.3/targetfile?bucket=somebucket?x-version=1385756114"
+What happens is that the host that handles the request will lookup which hosts actually have *targetfile* on their local file systems (replica hosts), and redirect (302) your client to one of these for a direct download.
+
+### Delete object
 
 The following will delete *targetfile* from the bucket *somebucket*. The request can be sent to all of the hosts in the cluster, and the result will be the same:
 
