@@ -75,7 +75,11 @@ What happens is that the host that handles the request will lookup which hosts a
 
 The following will delete *targetfile* from the bucket *somebucket*. The request can be sent to all of the hosts in the cluster, and the result will be the same:
 
-    # curl -s -L -X "DELETE" "http://10.0.0.4/targetfile?bucket=somebucket"
+    # curl -s -L -X "DELETE" "http://10.0.0.4/targetfile?bucket=somebucket" | python -mjson.tool
+
+Confirm that the object has been removed by trying to read it. The following should respond with a HTTP 404 Not Found:
+
+    # curl -i -s -L "http://10.0.0.4/targetfile?bucket=somebucket"
 
 
 ## Troubleshooting
