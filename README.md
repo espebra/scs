@@ -33,59 +33,55 @@ Lua, based on the OpenResty web application server.
 
 ## Installation
 
-Install xinetd and enable rsyncd (/etc/xinetd.d/rsync).
+To get a development/testing environment up and running:
 
-Download and install OpenResty (http://openresty.org/). We assume that OpenResty is installed to /usr/local/openresty/, but feel free to install it to another location.
-
-Example:
-
-    # wget http://openresty.org/download/ngx_openresty-1.2.8.1.tar.gz
-    # tar -xvzf ngx_openresty-1.2.8.1.tar.gz
-    # cd ngx_openresty-1.2.8.1
-    # ./configure --with-luajit --with-pcre-jit --prefix=/usr/local/openresty
-    # make
-    # make install
-
-Create the directory structure, fetch scs.
-
-    # mkdir -p /srv/scs /srv/files /etc/scs /var/log/scs
-    # cd /srv/scs
-    # git clone https://github.com/espebra/scs.git
-
-Copy the example configuration files and edit to suit your setup.
-
-    # cp /srv/scs/conf/scs.json.example /etc/scs/scs.json
-    # cp /srv/scs/conf/rsyncd.conf /etc/
-
-Copy the example init script.
-
-    # cp /srv/scs/conf/scs.init.example /etc/init.d/scs
-
-Each bucket needs a proper fqdn, so create the DNS entry *somebucket.scs.company.com* and point it to one of your hosts (for a SPOF lab setup) or to a service IP address that may be available on any of your hosts using anycast and/or IP failover (for production like setups).
-
-You should now be good to go.
+    # git clone https://github.com/espebra/scs
+    # cd scs
+    # vagrant up
 
 ## Example usage
 
 ### Upload
 
-The following will upload the content of the file *sourcefile* to the bucket *somebucket* with the file name *targetfile*. Targetfile may contain the character /, which will make it look like a directory structure.
+The following will upload the content of the file *sourcefile* to the bucket *somebucket* with the file name *targetfile*. Targetfile may contain the character /, which will make it look like a directory structure. The request can be sent to all of the hosts in the cluster, and the result will be the same:
 
-    # curl -L -H 'expect: 100-continue' --data-binary "@sourcefile" http://somebucket.scs.company.com/targetfile
+    # md5=$(md5sum sourcefile | awk '{print $1}')
+    # curl -L -H "expect: 100-continue" -H "x-md5: $md5" --data-binary "@sourcefile" "http://10.0.0.3/targetfile?bucket=somebucket"
 
-The file *targetfile* will be stored on the number of replica hosts as specified in your */etc/scs/scs.json*. The filename will be base64 encoded to allow weird characters. The file *targetfile* will be stored on the replica hosts in */srv/files/somebucket/d/G/F/dGFyZ2V0ZmlsZcKg*.
+To make it a bit easier to handle different buckets in the development environment, the bucket can be specified as a parameter as shown above. In production environments, this parameter may be given as the first part of the fqdn which is used:
+
+    # md5=$(md5sum sourcefile | awk '{print $1}')
+    # curl -L -H "expect: 100-continue" -H "x-md5: $md5" --data-binary "@sourcefile" "http://somebucket.scs.example.com/targetfile"
+
+The filename will be base64 encoded to allow weird characters, and will be stored in the file system in the directory */srv/files/objects/somebucket/d/G/F/dGFyZ2V0ZmlsZW5hbWU=/*. *somebucket* is the bucket name, */d/G/F/* is a directory structure to allow many files within the bucket and *dGFyZ2V0ZmlsZcKg* is the base64 encoded filename *targetfile*. When the upload is complete, an entry is be made in */srv/files/queue/* marking this object as changed. A replicator daemon monitors this directory and will replicate the objects found to the other replica hosts these objects should be replicated to according to their hash.
+
+The file *targetfile* is stored on the number of replica hosts and sites specified in */etc/scs/common.conf*. 
 
 ### Download
 
-The following will download *targetfile* from the bucket *somebucket*. 
+The following will download *targetfile* from the bucket *somebucket*. The request can be sent to all of the hosts in the cluster, and the result will be the same:
 
-    # GET http://somebucket.scs.company.com/targetfile
+    # GET "http://10.0.0.3/targetfile?bucket=somebucket"
+
+Or, using the fqdn to specify bucket:
+
+    # GET "http://somebucket.scs.example.com/targetfile"
 
 What happens is that the host that handles the request will lookup which hosts actually have *targetfile* on their local file systems (replica hosts), and redirect (302) your client to one of these - quite randomly.
 
+### DELETE
+
+The following will delete *targetfile* from the bucket *somebucket*. The request can be sent to all of the hosts in the cluster, and the result will be the same:
+
+    # curl -i -L -X "DELETE" "http://10.0.0.3/targetfile?bucket=somebucket"
+
+Or, using the fqdn to specify bucket:
+
+    # curl -i -L -X "DELETE" "http://somebucket.scs.example.com/targetfile"
+
 ## Troubleshooting
 
-* Ensure that you connect to scs using a valid hostname, not the IP-address of the host. The host header is being used as the name of the bucket.
+* Ensure that you connect to scs using a valid hostname, or that you specify the bucket as a parameter if connecting to scs using an IP address.
 * Ensure that xinetd or rsyncd is running, listening on port 873/tcp.
 * Ensure that /srv/files and /var/log/scs is writable by the user running scs.
 
