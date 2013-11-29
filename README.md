@@ -4,11 +4,6 @@ This is a proof of concept minimalistic distributed object store implemented in
 Lua, based on the OpenResty web application server. 
 
 
-## Status
-
-Not production ready. The API may change.
-
-
 ## Features
 
 * Fast.
@@ -104,6 +99,11 @@ Or, using the fqdn to specify bucket:
 * Lazy replication daemon to scan through all objects (not just the queue) and perform replication.
 * Reaper daemon to quarantine files with invalid md5 checksums.
 * API compability with some of the most used features in S3
+
+
+## Status
+
+Not production ready. The API may change.
 
 
 ## Thanks
