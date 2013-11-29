@@ -90,6 +90,7 @@ Or, using the fqdn to specify bucket:
 * Ensure that you connect to scs using a valid hostname, or that you specify the bucket as a parameter if connecting to scs using an IP address.
 * Ensure that xinetd or rsyncd is running, listening on port 873/tcp.
 * Ensure that /srv/files and /var/log/scs is writable by the user running scs.
+* /var/log/messages and /var/log/scs/error.log will provide information which is useful for debugging.
 
 ## Thanks
 
