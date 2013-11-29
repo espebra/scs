@@ -52,9 +52,7 @@ To make it a bit easier to handle different buckets in the development environme
     # md5=$(md5sum /path/to/sourcefile | awk '{print $1}')
     # curl -L -H "expect: 100-continue" -H "x-md5: $md5" --data-binary "@/path/to/sourcefile" "http://somebucket.scs.example.com/targetfile"
 
-The filename will be base64 encoded to allow weird characters, and will be stored in the file system in the directory */srv/files/objects/somebucket/d/G/F/dGFyZ2V0ZmlsZW5hbWU=/*. *somebucket* is the bucket name, */d/G/F/* is a directory structure to allow many files within the bucket and *dGFyZ2V0ZmlsZcKg* is the base64 encoded filename *targetfile*. 
-
-When the upload is complete, an entry is be made in */srv/files/queue/* marking this object as changed. A replicator daemon monitors this directory and will replicate the objects found to the other replica hosts these objects should be replicated to according to their hash.
+When the upload is complete, an entry is made in */srv/files/queue/* marking this object as changed. A replicator daemon monitors this directory and will replicate the objects found to the other replica hosts these objects should be replicated to according to their hash.
 
 The file *targetfile* is stored on the number of replica hosts and sites specified in */etc/scs/common.conf*. 
 
