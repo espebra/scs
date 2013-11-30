@@ -1,14 +1,13 @@
 # Simple Cloud Storage
 
-This is a proof of concept minimalistic distributed object store implemented in
-Lua, based on the OpenResty web application server. 
+This is a minimalistic distributed object store. It is implemented in Lua and runs on the OpenResty web application server. 
 
 
 ## Features
 
 * Fast.
 * Scalable.
-* Active/active multi location.
+* Active/active multi location (using anycast).
 * Non-SPOF.
 * Eventually consistent.
 
