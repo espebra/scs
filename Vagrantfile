@@ -4,6 +4,7 @@ def vm config, name, ip
     c.vm.network :private_network, ip: ip
     c.vm.box = 'puppetlabs centos6'
     c.vm.hostname = '%s.local' % name
+    c.vm.boot_timeout = 900
     c.vm.provider :virtualbox do |v|
       v.customize ['modifyvm', :id, '--name', name]
     end
