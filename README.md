@@ -9,6 +9,7 @@ This is a minimalistic distributed object store. It is implemented in Lua and ru
 * Scalable.
 * Active/active multi location (using anycast).
 * Non-SPOF.
+* Data integrity.
 * Eventually consistent.
 
 
